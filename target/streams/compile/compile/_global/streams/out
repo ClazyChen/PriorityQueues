@@ -1,6 +1,7 @@
-[0m[[0m[31merror[0m] [0m[0m/Users/mfsang/Documents/考研复试/PriorityQueues/ShiftRegister/src/main/scala/ShiftRegister/ShiftRegister.scala:42:36: type mismatch;[0m
-[0m[[0m[31merror[0m] [0m[0m found   : Int(1)[0m
-[0m[[0m[31merror[0m] [0m[0m required: chisel3.UInt[0m
-[0m[[0m[31merror[0m] [0m[0m      count_index := count_index + 1[0m
-[0m[[0m[31merror[0m] [0m[0m                                   ^[0m
-[0m[[0m[31merror[0m] [0m[0mone error found[0m
+[0m[[0m[31merror[0m] [0m[0m/Users/mfsang/Documents/考研复试/PriorityQueues/ShiftRegister/src/main/scala/ShiftRegister/ShiftRegister.scala:59:16: not found: value enq_Right_Entry[0m
+[0m[[0m[31merror[0m] [0m[0m      entry := enq_Right_Entry.bits[0m
+[0m[[0m[31merror[0m] [0m[0m               ^[0m
+[0m[[0m[31merror[0m] [0m[0m/Users/mfsang/Documents/考研复试/PriorityQueues/ShiftRegister/src/main/scala/ShiftRegister/ShiftRegister.scala:67:5: not found: value deq_Right_Entry[0m
+[0m[[0m[31merror[0m] [0m[0m    deq_Right_Entry := entry[0m
+[0m[[0m[31merror[0m] [0m[0m    ^[0m
+[0m[[0m[31merror[0m] [0m[0mtwo errors found[0m
