@@ -75,6 +75,7 @@ class ShiftRegisterTest extends AnyFlatSpec {
       c.io.dequeue_Signal.poke(false.B)
       c.clock.step(1)
 
+
     }
   }
 }
