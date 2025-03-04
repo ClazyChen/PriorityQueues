@@ -1,7 +1,4 @@
-[0m[[0m[31merror[0m] [0m[0m/Users/mfsang/Documents/考研复试/PriorityQueues/ShiftRegister/src/test/scala/ShiftRegister/ShiftRegisterTest.scala:59:12: value data_check is not a member of chisel3.Bundle{val dequeue_Signal: chisel3.Bool; val dequeue_Entry: ShiftRegister.PriorityEntry; val enqueue_Entry: chisel3.util.Valid[ShiftRegister.PriorityEntry]}[0m
-[0m[[0m[31merror[0m] [0m[0m      c.io.data_check(0).priority.expect(14.U)[0m
-[0m[[0m[31merror[0m] [0m[0m           ^[0m
-[0m[[0m[31merror[0m] [0m[0m/Users/mfsang/Documents/考研复试/PriorityQueues/ShiftRegister/src/test/scala/ShiftRegister/ShiftRegisterTest.scala:60:12: value data_check is not a member of chisel3.Bundle{val dequeue_Signal: chisel3.Bool; val dequeue_Entry: ShiftRegister.PriorityEntry; val enqueue_Entry: chisel3.util.Valid[ShiftRegister.PriorityEntry]}[0m
-[0m[[0m[31merror[0m] [0m[0m      c.io.data_check(1).priority.expect(11.U)[0m
-[0m[[0m[31merror[0m] [0m[0m           ^[0m
-[0m[[0m[31merror[0m] [0m[0mtwo errors found[0m
+[0m[[0m[31merror[0m] [0m[0m/Users/mfsang/Documents/考研复试/PriorityQueues/ShiftRegister/src/test/scala/ShiftRegister/ShiftRegisterTest.scala:14:24: not found: value depth[0m
+[0m[[0m[31merror[0m] [0m[0m      for(i <- 0 until depth) {[0m
+[0m[[0m[31merror[0m] [0m[0m                       ^[0m
+[0m[[0m[31merror[0m] [0m[0mone error found[0m

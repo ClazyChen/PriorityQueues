@@ -1,4 +1,4 @@
-[0m[[0m[31merror[0m] [0m[0m/Users/mfsang/Documents/考研复试/PriorityQueues/ShiftRegister/src/main/scala/ShiftRegister/ShiftRegister.scala:96:5: not found: value data_check[0m
-[0m[[0m[31merror[0m] [0m[0m    data_check(i) := modules(i).stored[0m
-[0m[[0m[31merror[0m] [0m[0m    ^[0m
+[0m[[0m[31merror[0m] [0m[0m/Users/mfsang/Documents/考研复试/PriorityQueues/ShiftRegister/src/main/scala/ShiftRegister/ShiftRegister.scala:60:17: not found: value o[0m
+[0m[[0m[31merror[0m] [0m[0m    } .elsewhen(o.new_Entry.valid && io.shift_Flag_In) {[0m
+[0m[[0m[31merror[0m] [0m[0m                ^[0m
 [0m[[0m[31merror[0m] [0m[0mone error found[0m

@@ -37,6 +37,8 @@ class ShiftRegisterBlock(priorityWidth: Int, flowWidth: Int) extends Module {
     val deq_Left_Entry  = Input(new PriorityEntry(priorityWidth, flowWidth))          // 出队模式下，从左侧相邻模块获取数据（用于右移）
     val deq_Right_Entry = Output(new PriorityEntry(priorityWidth, flowWidth))         // 出队模式下，此输出用于传递给右侧模块
     val stored          = Output(new PriorityEntry(priorityWidth, flowWidth))         // 出队模式下，此输出用于产生最终的输出结果
+
+
   })
 
   val entry = RegInit(PriorityEntry.default(priorityWidth, flowWidth))
@@ -47,14 +49,12 @@ class ShiftRegisterBlock(priorityWidth: Int, flowWidth: Int) extends Module {
   io.deq_Right_Entry      := entry
   io.stored               := entry
 
-
   when(io.enqueue_Signal) {
     // 入队操作：局部决策逻辑
     // 只有当来自右侧模块未发生移位且新条目有效时，
     // 若新条目的优先级高于当前条目，则本模块锁存新条目，并将原条目作为移位数据输出给左侧模块。
     when(io.new_Entry.valid && !io.shift_Flag_In && (io.new_Entry.bits.priority > entry.priority)) {
       // 锁存新条目，同时输出原条目实现向左侧模块移位
-      io.enq_Left_Entry.bits  := entry
       io.enq_Left_Entry.valid := true.B
       io.shift_Flag_Out       := true.B
       entry := io.new_Entry.bits
@@ -69,8 +69,8 @@ class ShiftRegisterBlock(priorityWidth: Int, flowWidth: Int) extends Module {
     }
   } .elsewhen(io.dequeue_Signal) {
     io.stored := entry
-    io.deq_Right_Entry := entry
     // 出队操作：模块0的条目将被读取，而其他模块则从左侧模块接收数据，实现所有条目向右移动
+    io.deq_Right_Entry := entry
     entry := io.deq_Left_Entry
   } .otherwise {
     // 否则保持当前条目不变
@@ -84,10 +84,15 @@ class PriorityQueue(val priorityWidth: Int, val flowWidth: Int, val depth: Int) 
     val dequeue_Entry  = Output(new PriorityEntry(priorityWidth, flowWidth))        // 出队接口：正常情况下直接输出module(0)
     val enqueue_Entry  = Input(Valid(new PriorityEntry(priorityWidth, flowWidth)))  // 入队接口：带 valid 信号的新条目输入
 
+    val data_check      = Output(Vec(depth, new PriorityEntry(priorityWidth, flowWidth)))
   })
 
   // 实例化一组 Blcok
   val modules = VecInit(Seq.fill(depth)(Module(new ShiftRegisterBlock(priorityWidth, flowWidth)).io))
+
+  for(i <- 0 until depth) {
+    io.data_check(i) := modules(i).stored
+  }
 
   // 入队模式下，各模块之间通过“移位数据”传递实现局部决策链：
   // 最右侧模块没有右侧邻接模块，故移位输入及标志置 false
@@ -118,4 +123,5 @@ class PriorityQueue(val priorityWidth: Int, val flowWidth: Int, val depth: Int) 
   for(i <- 0 until depth-1) {
     modules(i).deq_Left_Entry := modules(i+1).deq_Right_Entry
   }
+
 }
