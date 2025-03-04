@@ -26,13 +26,11 @@ class ShiftRegisterBlock(priorityWidth: Int, flowWidth: Int) extends Module {
 
   val io = IO(new Bundle{
     val new_Entry       = Input(Valid(new PriorityEntry(priorityWidth, flowWidth)))   // 入队时，通过全局总线接收的新条目
-
     val enqueue_Signal  = Input(Bool())                                               // 入队操作使能信号（当 enq 有效且 deq 未激活时进入入队逻辑）
     val enq_Right_Entry = Input(Valid(new PriorityEntry(priorityWidth, flowWidth)))   // 入队模式下，从右侧相邻模块接收移位数据及其标志
     val shift_Flag_In   = Input(Bool())                                               // 入队模式下，从右侧相邻模块接收标志
     val shift_Flag_Out  = Output(Bool())                                              // 入队模式下的移位标志，若本模块发生了新元素的入队或右侧模块的已经接收了新元素，则输出为 true
     val enq_Left_Entry  = Output(Valid(new PriorityEntry(priorityWidth, flowWidth)))  // 入队模式下，将本模块需要右移的与元素通过此端口移位给左侧模块
-
     val dequeue_Signal  = Input(Bool())                                               // 出队操作使能信号（当deq 有效时进入出队逻辑）
     val deq_Left_Entry  = Input(new PriorityEntry(priorityWidth, flowWidth))          // 出队模式下，从左侧相邻模块获取数据（用于右移）
     val deq_Right_Entry = Output(new PriorityEntry(priorityWidth, flowWidth))         // 出队模式下，此输出用于传递给右侧模块
@@ -117,11 +115,11 @@ class PriorityQueue(val priorityWidth: Int, val flowWidth: Int, val depth: Int) 
   for(i <- 0 until depth) {
     modules(i).dequeue_Signal := io.dequeue_Signal
   }
-  // 出队输出来自模块0（始终保存最高优先级条目）
-  io.dequeue_Entry := modules(0).stored
   // 出队模式下，各模块之间通过左侧传递数据实现整体右移
   for(i <- 0 until depth-1) {
     modules(i).deq_Left_Entry := modules(i+1).deq_Right_Entry
   }
+  // 出队输出来自模块0（始终保存最高优先级条目）
+  io.dequeue_Entry := modules(0).stored
 
 }

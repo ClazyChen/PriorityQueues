@@ -55,8 +55,12 @@ class ShiftRegisterTest extends AnyFlatSpec {
       c.io.data_check(0).flowId.expect(102.U)
       c.io.data_check(1).priority.expect(5.U)
       c.io.data_check(1).flowId.expect(100.U)
+      c.io.data_check(2).priority.expect(3.U)
+      c.io.data_check(2).flowId.expect(101.U)
 
       c.io.enqueue_Entry.valid.poke(false.B)
+
+      c.clock.step(4)
 
       // --- 出队测试 ---
       // 触发出队操作
@@ -74,9 +78,6 @@ class ShiftRegisterTest extends AnyFlatSpec {
       // 关闭出队使能
       c.io.dequeue_Signal.poke(false.B)
       c.clock.step(1)
-
-
     }
   }
 }
-

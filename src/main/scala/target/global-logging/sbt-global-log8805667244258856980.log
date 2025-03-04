@@ -1,0 +1,87 @@
+[debug] > Exec(early(addDefaultCommands), None, None)
+[debug] > Exec(addDefaultCommands, None, None)
+[debug] > Exec(early(initialize), None, None)
+[debug] > Exec(initialize, None, None)
+[debug] > Exec(boot, None, None)
+[debug] > Exec(writeSbtVersion, None, None)
+[debug] > Exec(reload, None, None)
+[debug] > Exec(sbtStashOnFailure, None, None)
+[debug] > Exec(onFailure loadFailed, None, None)
+[debug] > Exec(loadp, None, None)
+[info] welcome to sbt 1.9.7 (Oracle Corporation Java 22.0.1)
+[debug] Load.defaultLoad until apply took 53.466875ms
+[debug]           Load.loadUnit: plugins took 33.951708ms
+[debug]           Load.loadUnit: defsScala took 0.073292ms
+[debug] [Loading] Scanning directory /Users/mfsang/Documents/考研复试/PriorityQueues/ShiftRegister/src/main/scala/project
+[debug] [Loading] Found non-root projects 
+[debug] [Loading] Done in /Users/mfsang/Documents/考研复试/PriorityQueues/ShiftRegister/src/main/scala/project, returning: ()
+[debug] deducing auto plugins based on known facts Set(Atom(sbt.plugins.CorePlugin)) and clauses Clauses(Clause(Atom(sbt.plugins.JvmPlugin),Set(Atom(sbt.plugins.IvyPlugin)))
+[debug] Clause(Atom(sbt.ScriptedPlugin),Set(Atom(sbt.plugins.JvmPlugin)))
+[debug] Clause(Atom(sbt.plugins.SbtPlugin),Set(Atom(sbt.ScriptedPlugin)))
+[debug] Clause(Atom(sbt.plugins.SemanticdbPlugin),Set(Atom(sbt.plugins.JvmPlugin)))
+[debug] Clause(Atom(sbt.plugins.JUnitXmlReportPlugin),Set(Atom(sbt.plugins.JvmPlugin)))
+[debug] Clause(Atom(sbt.plugins.MiniDependencyTreePlugin),Set(Atom(sbt.plugins.JvmPlugin)))
+[debug] Clause(Atom(sbt.plugins.CorePlugin),Set(Atom(sbt.plugins.IvyPlugin)))
+[debug] Clause(Atom(sbt.plugins.IvyPlugin),Set(Atom(sbt.plugins.JvmPlugin)))
+[debug] Clause(Atom(sbt.plugins.JvmPlugin),Set(Atom(sbt.plugins.SemanticdbPlugin)))
+[debug] Clause(Atom(sbt.plugins.JvmPlugin),Set(Atom(sbt.plugins.JUnitXmlReportPlugin)))
+[debug] Clause(Atom(sbt.plugins.CorePlugin),Set(Atom(sbt.plugins.Giter8TemplatePlugin)))
+[debug] Clause(Atom(sbt.plugins.JvmPlugin),Set(Atom(sbt.plugins.MiniDependencyTreePlugin))))
+[debug]   :: deduced result: Matched(sbt.plugins.CorePlugin,sbt.plugins.Giter8TemplatePlugin,sbt.plugins.IvyPlugin,sbt.plugins.JvmPlugin,sbt.plugins.MiniDependencyTreePlugin,sbt.plugins.JUnitXmlReportPlugin,sbt.plugins.SemanticdbPlugin)
+[debug] Plugins.deducer#function took 6.034708 ms
+[debug]               Load.resolveProject(scala-build) took 16.986583ms
+[debug]             Load.loadTransitive: finalizeProject(Project(id scala-build, base: /Users/mfsang/Documents/考研复试/PriorityQueues/ShiftRegister/src/main/scala/project, plugins: List(<none>))) took 33.389084ms
+[debug] [Loading] Done in /Users/mfsang/Documents/考研复试/PriorityQueues/ShiftRegister/src/main/scala/project, returning: (scala-build)
+[debug]           Load.loadUnit: loadedProjectsRaw took 39.824584ms
+[debug]           Load.loadUnit: cleanEvalClasses took 0.06575ms
+[debug]         Load.loadUnit(file:/Users/mfsang/Documents/考研复试/PriorityQueues/ShiftRegister/src/main/scala/project/, ...) took 75.723833ms
+[debug]       Load.apply: load took 270.327584ms
+[debug]       Load.apply: resolveProjects took 1.919541ms
+[debug]       Load.apply: finalTransforms took 37.4995ms
+[debug]       Load.apply: config.delegates took 2.220167ms
+[debug]       Load.apply: Def.make(settings)... took 227.247084ms
+[debug]       Load.apply: structureIndex took 46.835709ms
+[debug]       Load.apply: mkStreams took 0.506958ms
+[info] loading project definition from /Users/mfsang/Documents/考研复试/PriorityQueues/ShiftRegister/src/main/scala/project
+[debug] Running task... Cancel: Signal, check cycles: false, forcegc: true
+[debug]     Load.loadUnit: plugins took 1116.99475ms
+[debug]     Load.loadUnit: defsScala took 0.001708ms
+[debug] [Loading] Scanning directory /Users/mfsang/Documents/考研复试/PriorityQueues/ShiftRegister/src/main/scala
+[debug] [Loading] Found non-root projects 
+[debug] [Loading] Done in /Users/mfsang/Documents/考研复试/PriorityQueues/ShiftRegister/src/main/scala, returning: ()
+[debug] deducing auto plugins based on known facts Set(Atom(sbt.plugins.CorePlugin)) and clauses Clauses(Clause(Atom(sbt.plugins.JvmPlugin),Set(Atom(sbt.plugins.IvyPlugin)))
+[debug] Clause(Atom(sbt.ScriptedPlugin),Set(Atom(sbt.plugins.JvmPlugin)))
+[debug] Clause(Atom(sbt.plugins.SbtPlugin),Set(Atom(sbt.ScriptedPlugin)))
+[debug] Clause(Atom(sbt.plugins.SemanticdbPlugin),Set(Atom(sbt.plugins.JvmPlugin)))
+[debug] Clause(Atom(sbt.plugins.JUnitXmlReportPlugin),Set(Atom(sbt.plugins.JvmPlugin)))
+[debug] Clause(Atom(sbt.plugins.MiniDependencyTreePlugin),Set(Atom(sbt.plugins.JvmPlugin)))
+[debug] Clause(Atom(sbt.plugins.CorePlugin),Set(Atom(sbt.plugins.IvyPlugin)))
+[debug] Clause(Atom(sbt.plugins.IvyPlugin),Set(Atom(sbt.plugins.JvmPlugin)))
+[debug] Clause(Atom(sbt.plugins.JvmPlugin),Set(Atom(sbt.plugins.SemanticdbPlugin)))
+[debug] Clause(Atom(sbt.plugins.JvmPlugin),Set(Atom(sbt.plugins.JUnitXmlReportPlugin)))
+[debug] Clause(Atom(sbt.plugins.CorePlugin),Set(Atom(sbt.plugins.Giter8TemplatePlugin)))
+[debug] Clause(Atom(sbt.plugins.JvmPlugin),Set(Atom(sbt.plugins.MiniDependencyTreePlugin))))
+[debug]   :: deduced result: Matched(sbt.plugins.CorePlugin,sbt.plugins.Giter8TemplatePlugin,sbt.plugins.IvyPlugin,sbt.plugins.JvmPlugin,sbt.plugins.MiniDependencyTreePlugin,sbt.plugins.JUnitXmlReportPlugin,sbt.plugins.SemanticdbPlugin)
+[debug] Plugins.deducer#function took 0.918875 ms
+[debug]         Load.resolveProject(scala) took 0.561125ms
+[debug]       Load.loadTransitive: finalizeProject(Project(id scala, base: /Users/mfsang/Documents/考研复试/PriorityQueues/ShiftRegister/src/main/scala, plugins: List(<none>))) took 1.704ms
+[debug] [Loading] Done in /Users/mfsang/Documents/考研复试/PriorityQueues/ShiftRegister/src/main/scala, returning: (scala)
+[debug]     Load.loadUnit: loadedProjectsRaw took 2.397625ms
+[debug]     Load.loadUnit: cleanEvalClasses took 0.007083ms
+[debug]   Load.loadUnit(file:/Users/mfsang/Documents/考研复试/PriorityQueues/ShiftRegister/src/main/scala/, ...) took 1120.10225ms
+[debug] Load.apply: load took 1134.130417ms
+[debug] Load.apply: resolveProjects took 0.161709ms
+[debug] Load.apply: finalTransforms took 14.498875ms
+[debug] Load.apply: config.delegates took 0.2485ms
+[debug] Load.apply: Def.make(settings)... took 58.618375ms
+[debug] Load.apply: structureIndex took 13.976ms
+[debug] Load.apply: mkStreams took 0.001375ms
+[info] set current project to scala (in build file:/Users/mfsang/Documents/考研复试/PriorityQueues/ShiftRegister/src/main/scala/)
+[debug] > Exec(sbtPopOnFailure, None, None)
+[debug] > Exec(resumeFromFailure, None, None)
+[debug] > Exec(notifyUsersAboutShell, None, None)
+[debug] > Exec(iflast shell, None, None)
+[debug] > Exec(shell, None, None)
+[info] sbt server started at local:///Users/mfsang/.sbt/1.0/server/129e76da97debc662be6/sock
+[debug] Writing bsp connection file
+[info] started sbt server
