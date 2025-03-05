@@ -4,9 +4,8 @@ import org.scalatest.flatspec.AnyFlatSpec
 import scala.util.Random
 
 class SRTest extends  AnyFlatSpec with ChiselScalatestTester {
-    // 测试插入
     "ShiftRegister" should "correct" in {
-        test(new ShiftRegister(16, 0, 20))
+        test(new ShiftRegister(0, 16, 20))
             .withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
                 val randomArray = Array.fill(50)(Random.nextInt(65535))
                 val sortedArray = randomArray.sorted
@@ -18,12 +17,13 @@ class SRTest extends  AnyFlatSpec with ChiselScalatestTester {
                     for (i <- 0 until 50) {
                         dut.io.read.poke(false.B)
                         dut.io.write.poke(true.B)
-                        dut.io.newEntry.poke(randomArray(i).U(16.W))
+                        dut.io.newEntry.priority.poke(randomArray(i))
+                        dut.io.newEntry.metadata.poke(0)
                         dut.clock.step()
                         if (minValue > randomArray(i)) {
                             minValue = randomArray(i)
                         }
-                        dut.io.highestEntry.expect(minValue.U)
+                        dut.io.highestEntry.priority.expect(minValue.U)
                     }
 
                     // 验证队列中是否剩下20个优先级最高元素
@@ -31,7 +31,7 @@ class SRTest extends  AnyFlatSpec with ChiselScalatestTester {
                         dut.io.read.poke(true.B)
                         dut.io.write.poke(false.B)
                         dut.clock.step()
-                        dut.io.highestEntry.expect(sortedArray(i + 1).U)
+                        dut.io.highestEntry.priority.expect(sortedArray(i + 1).U)
                     }
 
                     // 剩下应该都是空
@@ -39,7 +39,7 @@ class SRTest extends  AnyFlatSpec with ChiselScalatestTester {
                         dut.io.read.poke(true.B)
                         dut.io.write.poke(false.B)
                         dut.clock.step()
-                        dut.io.highestEntry.expect(65535.U)
+                        dut.io.highestEntry.priority.expect(65535.U)
                     }
                 }
 

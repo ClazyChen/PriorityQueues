@@ -1,31 +1,17 @@
 
 import chisel3._
 
-object Functions {
-    // >
-    def cmpGreater(a: UInt, b: UInt): Bool = {
-        return (b -& a)(a.getWidth)
-    }
-}
-
-/*
-* pWidth:  优先级位宽
-* dataWidth: 元数据位宽
-* blockCount: block个数
-* */
-class ShiftRegister(pWidth: Int, dataWidth : Int, blockCount : Int) extends Module {
+class ShiftRegister(dataWidth: Int, pWidth: Int, blockCount : Int) extends Module {
     val io = IO(new Bundle{
         val read = Input(Bool())
         val write = Input(Bool())
-        val newEntry = Input(UInt(pWidth.W + dataWidth.W))
-        val highestEntry = Output(UInt(pWidth.W + dataWidth.W))
+        val newEntry = Input(new Entry(dataWidth, pWidth))
+        val highestEntry = Output(new Entry(dataWidth, pWidth))
     })
 
-    // 初始为全1，优先级最低
-    val entryArray = RegInit(VecInit(Seq.fill(blockCount)(~0.U(pWidth.W + dataWidth.W))))
-    val cmpArray = Wire(Vec(blockCount, Bool()))
+    val entryArray = RegInit(VecInit(Seq.fill(blockCount)(Entry(dataWidth, pWidth) )))
+    val cmpArray = Wire(Vec(blockCount, Bool())) // 暂存比较结果
 
-    // TODO：这里不初始化会报错，为什么
     for (i <- 0 until blockCount) {
         cmpArray(i) := false.B
     }
@@ -35,14 +21,14 @@ class ShiftRegister(pWidth: Int, dataWidth : Int, blockCount : Int) extends Modu
         for (i <- 0 until blockCount - 1) {
             entryArray(i) := entryArray(i + 1)
         }
-        entryArray(blockCount - 1) := ~0.U(pWidth.W + dataWidth.W)
+        entryArray(blockCount - 1) := Entry(dataWidth, pWidth)
     }.elsewhen(!io.read && io.write) {
         // 先暂存比较结果
         for (i <- 0 until blockCount) {
-            cmpArray(i) := Functions.cmpGreater(entryArray(i)(pWidth - 1, 0), io.newEntry(pWidth - 1, 0))
+            cmpArray(i) := Functions.cmpGreater(entryArray(i).priority, io.newEntry.priority)
         }
 
-        // 如果优先级允许等于~0，那么这里会导致无法插入优先级等于~0的元素，因为优先级相等时按先后顺序
+        // 如果优先级允许等于最大值，那么这里会导致无法插入优先级等于最大值的元素，因为优先级相等时按先后顺序
         // 这里当它不允许了
 
         // 对0号元素单独处理
@@ -65,6 +51,6 @@ class ShiftRegister(pWidth: Int, dataWidth : Int, blockCount : Int) extends Modu
 
 object Main extends App {
     println("Hello Chisel World")
-    emitVerilog(new ShiftRegister(16, 16, 10))
+    emitVerilog(new ShiftRegister(0, 16, 10))
     //emitVerilog(new ALU)
 }
