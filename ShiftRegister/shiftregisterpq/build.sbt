@@ -1,5 +1,7 @@
 val scala3Version = "3.6.3"
 
+val chiselVersion = "6.6.0"
+
 lazy val root = project
   .in(file("."))
   .settings(
