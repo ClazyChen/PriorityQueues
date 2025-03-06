@@ -52,5 +52,5 @@ class ShiftRegister(dataWidth: Int, pWidth: Int, blockCount : Int) extends Modul
 object Main extends App {
     println("Hello Chisel World")
     emitVerilog(new ShiftRegister(0, 16, 10))
-    //emitVerilog(new ALU)
+    emitVerilog(new Systolic(0, 16, 10))
 }

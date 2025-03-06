@@ -9,8 +9,8 @@ object Entry {
     // 定义默认初始化方法
     def apply(dataWidth: Int, pWidth: Int): Entry = {
         val struct = Wire(new Entry(dataWidth, pWidth))
-        struct.metadata := 0.U(8.W)
-        struct.priority := -1.S(16.W).asUInt
+        struct.metadata := 0.U(dataWidth.W)
+        struct.priority := -1.S(pWidth.W).asUInt
         struct
     }
 
