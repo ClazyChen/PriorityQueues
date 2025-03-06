@@ -6,7 +6,7 @@ import chisel3.simulator.EphemeralSimulator._
 
 
 class SystolicArrayTester extends AnyFlatSpec{
-  it should "enqueue an entry correctly" in {
+  it should "enqueue and dequeue correctly" in {
     // 使用 priorityWidth = 4, flowWidth = 4, depth = 4 作为测试参数
     simulate(new SystolicArray(4, 4, 4)){ dut =>
 
@@ -74,5 +74,4 @@ class SystolicArrayTester extends AnyFlatSpec{
     }
   }
 }
-
 
