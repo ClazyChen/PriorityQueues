@@ -68,6 +68,9 @@ class ModifiedSystolicArrayBlock(val priorityWidth: Int, val flowWidth: Int, val
     val enqueue_Shift_Left_Entry  = Output(new PriorityEntry(priorityWidth, flowWidth))
     // 在出队模式下，用于从左侧模块获取到邻接的元素，在模块0～length-2中，应与其左侧的block_dequeue_
     val dequeue_Shift_Left_Entry  = Input(new PriorityEntry(priorityWidth, flowWidth))
+
+    val block_output_enqueue_Signal = Output(Bool())
+    val block_output_dequeue_Signal = Output(Bool())
   })
 
   // 实例化一组ShiftBlocks
@@ -78,6 +81,8 @@ class ModifiedSystolicArrayBlock(val priorityWidth: Int, val flowWidth: Int, val
   for(i <- 0 until depth) {
     io.data_check(i) := shiftblocks(i).stored_entry
   }
+  io.block_output_enqueue_Signal := io.block_enqueue_Signal
+  io.block_output_dequeue_Signal := io.block_dequeue_Signal
   // ---------------------------------------------------------------------------------------
   // 入队逻辑块：
   // 新入队的元素显然不会插入最右侧Block的右侧
@@ -114,7 +119,6 @@ class ModifiedSystolicArrayBlock(val priorityWidth: Int, val flowWidth: Int, val
   }
   shiftblocks(depth-1).dequeue_Left_Entry := io.dequeue_Shift_Left_Entry
   // ---------------------------------------------------------------------------------------
-
 
   when(io.block_enqueue_Signal) {
     when(entry_counter < depth.U - 1.U) {
@@ -164,10 +168,25 @@ class ModifiedSystolicArrayPriorityQueue(val priorityWidth: Int, val flowWidth: 
     val enqueue_Entry = Input(new PriorityEntry(priorityWidth, flowWidth))
     val dequeue_Entry = Output(new PriorityEntry(priorityWidth, flowWidth))
   })
+
   val modules = VecInit(Seq.fill(length)(Module(new ModifiedSystolicArrayBlock(priorityWidth, flowWidth, depth)).io))
 
+//  val data_check = Output(Vec(depth, new PriorityEntry(priorityWidth, flowWidth)))
+  modules(0).block_enqueue_Signal := io.enqueue_Signal
+  modules(0).block_dequeue_Signal := io.dequeue_Signal
+  modules(0).block_enqueue_entry := io.enqueue_Entry
+  io.dequeue_Entry := modules(0).block_dequeue_entry
 
+  for(i <- 1 until length) {
+    // 对于模块1～length-1来说：入队模式下入队的元素为右侧模块溢出的元素
+    // 对于模块0～length-2来说：出队模式下补入的元素为左侧模块出队的元素
+    modules(i).block_enqueue_entry := modules(i-1).enqueue_Shift_Left_Entry
+    modules(i-1).dequeue_Shift_Left_Entry := modules(i).block_dequeue_entry
+  }
+  modules(length-1).dequeue_Shift_Left_Entry := PriorityEntry.default(priorityWidth, flowWidth)
 
-
-
+  for(i <- 1 until length) {
+    modules(i).block_enqueue_Signal := modules(i-1).block_output_enqueue_Signal
+    modules(i).block_dequeue_Signal := modules(i-1).block_output_enqueue_Signal
+  }
 }
