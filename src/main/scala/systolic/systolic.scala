@@ -18,8 +18,8 @@ class Systolic(dataWidth : Int, pWidth: Int, capacity : Int) extends Module {
     val state = RegInit(0.U(1.W)) // 控制脉动状态
 
     // B是temp register
-    val entryArrayA = RegInit(VecInit(Seq.fill(capacity_)(Entry(dataWidth, pWidth))))
-    val entryArrayB = RegInit(VecInit(Seq.fill(capacity_)(Entry(dataWidth, pWidth))))
+    val entryArrayA = RegInit(VecInit(Seq.fill(capacity_)(Entry.default(dataWidth, pWidth))))
+    val entryArrayB = RegInit(VecInit(Seq.fill(capacity_)(Entry.default(dataWidth, pWidth))))
 
     io.highestEntry := entryArrayA(0)
 
@@ -30,11 +30,11 @@ class Systolic(dataWidth : Int, pWidth: Int, capacity : Int) extends Module {
         // 即A(i - 1) B(i - 1)  A(i)比较，其中已知A(i - 1) <= B(i - 1)
         // 按序赋值到A(i - 1) A(i) B(i) 处
         when (state === (i % 2).U) {
-            when(Functions.cmpGreater(entryArrayA(i).priority, entryArrayB(i - 1).priority)) {
+            when(entryArrayA(i).rank > entryArrayB(i - 1).rank) {
                 // A(i-1) <= B(i-1) <= A(i)
                 entryArrayA(i) := entryArrayB(i - 1)
                 entryArrayB(i) := entryArrayA(i)
-            }.elsewhen(Functions.cmpGreater(entryArrayA(i - 1).priority, entryArrayA(i).priority)) {
+            }.elsewhen(entryArrayA(i - 1).rank > entryArrayA(i).rank) {
                 // A(i) <= A(i-1) <= B(i-1)
                 entryArrayA(i - 1) := entryArrayA(i)
                 entryArrayA(i) := entryArrayA(i - 1)
@@ -49,11 +49,11 @@ class Systolic(dataWidth : Int, pWidth: Int, capacity : Int) extends Module {
     // 偶数项脉动时才能处理输入，这样block2、4、6、8...发生脉动时刚好block0也写入
     when (state === 0.U) {
         when(io.enqueue && !io.dequeue) {
-            entryArrayA(0).priority := 0.U
+            entryArrayA(0).rank := 0.U
             entryArrayB(0) := io.newEntry
         }.elsewhen(!io.enqueue && io.dequeue) {
-            entryArrayA(0).priority := -1.S(pWidth.W).asUInt
-            entryArrayB(0).priority := -1.S(pWidth.W).asUInt
+            entryArrayA(0).rank := -1.S(pWidth.W).asUInt
+            entryArrayB(0).rank := -1.S(pWidth.W).asUInt
         }
     }
 }

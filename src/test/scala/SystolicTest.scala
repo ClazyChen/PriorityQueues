@@ -17,14 +17,12 @@ class SystolicTest extends  AnyFlatSpec with ChiselScalatestTester {
                     for (i <- 0 until 50) {
                         dut.io.dequeue.poke(false.B)
                         dut.io.enqueue.poke(true.B)
-                        dut.io.newEntry.priority.poke(randomArray(i))
+                        dut.io.newEntry.rank.poke(randomArray(i))
                         dut.io.newEntry.metadata.poke(0)
                         dut.clock.step(2) // 两个周期才能执行一次操作
                         if (minValue > randomArray(i)) {
                             minValue = randomArray(i)
                         }
-                        // 入队不显示优先级最高元素，出队才显示
-                        // dut.io.highestEntry.priority.expect(minValue.U)
                     }
 
                     // 验证队列中是否剩下20个优先级最高元素
@@ -32,7 +30,7 @@ class SystolicTest extends  AnyFlatSpec with ChiselScalatestTester {
                         dut.io.dequeue.poke(true.B)
                         dut.io.enqueue.poke(false.B)
                         dut.clock.step(2)
-                        dut.io.highestEntry.priority.expect(sortedArray(i).U)
+                        dut.io.highestEntry.rank.expect(sortedArray(i).U)
                     }
 
                     // 剩下应该都是空
@@ -40,7 +38,7 @@ class SystolicTest extends  AnyFlatSpec with ChiselScalatestTester {
                         dut.io.dequeue.poke(true.B)
                         dut.io.enqueue.poke(false.B)
                         dut.clock.step()
-                        dut.io.highestEntry.priority.expect(65535.U)
+                        dut.io.highestEntry.rank.expect(65535.U)
                     }
                 }
 
