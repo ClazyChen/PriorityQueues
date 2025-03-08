@@ -9,7 +9,6 @@ import org.scalatest.flatspec.AnyFlatSpec;
 
 class ShiftRegisterPriorityQueueTest extends AnyFlatSpec with ChiselScalatestTester {
 
-
     "PriorityQueueBlock" should "enqueue and dequeue entries properly" in {
 
         test(new PriorityQueueBlock(0,4,4)) { c => 
@@ -83,7 +82,7 @@ class ShiftRegisterPriorityQueueTest extends AnyFlatSpec with ChiselScalatestTes
         c.io.output_entry.rank.expect(0xf.U);
         
         // All test cases passed
-        
+
         }
     }
 

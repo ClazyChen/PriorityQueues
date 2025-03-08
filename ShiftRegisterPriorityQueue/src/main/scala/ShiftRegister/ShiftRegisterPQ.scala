@@ -26,21 +26,21 @@ class ShiftRegisterBlock(dataWidth : Int,rankWidth : Int) extends Module{
 
     // 内部io接口
     val io = IO(new Bundle{
-        val input_prev = Input(new EntryBlock(dataWidth,rankWidth));
-        val input_nxt = Input(new EntryBlock(dataWidth,rankWidth));
-        val output_prev = Output(new EntryBlock(dataWidth,rankWidth));
-        val output_nxt = Output(new EntryBlock(dataWidth,rankWidth));
-        val insert_cur_index = Input(Bool());
-        val cur_input_entry = Input(new EntryBlock(dataWidth,rankWidth));
-        val cur_output_entry = Output(new EntryBlock(dataWidth,rankWidth));
-        val cmd = Input(Valid(UInt(2.W)));
+        val input_prev = Input(new EntryBlock(dataWidth,rankWidth));        // 从前一个block接收的entry
+        val input_nxt = Input(new EntryBlock(dataWidth,rankWidth));         // 从后一个block接收的entry
+        val output_prev = Output(new EntryBlock(dataWidth,rankWidth));      // 向前一个block输出的entry
+        val output_nxt = Output(new EntryBlock(dataWidth,rankWidth));       // 向后一个block输出的entry
+        val insert_cur_index = Input(Bool());                               // 标志位：用于block内部判断当前是否为插入位置
+        val cur_input_entry = Input(new EntryBlock(dataWidth,rankWidth));   // 当前新输入的entry
+        val cur_output_entry = Output(new EntryBlock(dataWidth,rankWidth)); // 当前block保存的entry，用一个接口供外部访问
+        val cmd = Input(Valid(UInt(2.W)));                                  // cmd 表示当前block接受的指令
     });
     
     // 每个shiftregister内部的控制信号
     val DEQ = 0.U(2.W);
     val ENQ = 1.U(2.W);
 
-    // 用来保存entry的寄存器
+    // 用来保存entry的寄存器，RegInit要求参数是硬件类型
     val entry_holder = RegInit(EntryBlock.default(dataWidth,rankWidth));
 
     // initialization output
@@ -58,7 +58,7 @@ class ShiftRegisterBlock(dataWidth : Int,rankWidth : Int) extends Module{
                 when (io.insert_cur_index) {
                     entry_holder := io.cur_input_entry; // latch
                 }           
-                .elsewhen(entry_holder.rank > io.cur_input_entry.rank) { // to-be-fixed
+                .elsewhen(entry_holder.rank > io.cur_input_entry.rank) {
                     entry_holder := io.input_prev; // 从下标小的一侧输入 左移
                 }
                 .otherwise {
@@ -80,18 +80,18 @@ class PriorityQueueBlock(dataWidth: Int,rankWidth : Int,depth : Int) extends Mod
 
     // 外部io接口
     val io = IO(new Bundle{
-        val read = Input(Bool());
-        val write = Input(Bool());
-        val new_entry = Input(new EntryBlock(dataWidth,rankWidth)); 
-        val output_entry = Output(new EntryBlock(dataWidth,rankWidth));
+        val read = Input(Bool());                                       // 外部输入信号：read
+        val write = Input(Bool());                                      // 外部输入信号：write                             
+        val new_entry = Input(new EntryBlock(dataWidth,rankWidth));     // 新到达的entry
+        val output_entry = Output(new EntryBlock(dataWidth,rankWidth)); // 最终输出的，优先级最高的entry
     });
 
     // 对应的控制信号
     val DEQ = 0.U(2.W);
     val ENQ = 1.U(2.W);
-    val PULSE = 2.U(2.W);
-    val cmd_valid = true.B;
-    val cmd = Mux(io.write,ENQ,Mux(io.read,DEQ,PULSE));
+    val PULSE = 2.U(2.W); // 表示系统暂停，在这里没有使用到
+    val cmd_valid = true.B; // 默认新到达的entry都是有效的
+    val cmd = Mux(io.write,ENQ,Mux(io.read,DEQ,PULSE)); // 产生控制信号
 
     // 生成depth个ShiftRegisterBlock
     val blocks = Seq.fill(depth)(Module(new ShiftRegisterBlock(dataWidth,rankWidth)));
@@ -108,9 +108,11 @@ class PriorityQueueBlock(dataWidth: Int,rankWidth : Int,depth : Int) extends Mod
         blocks(i).io.cur_input_entry := io.new_entry;
     }
 
+    // 给未初始化的sink初始化
     blocks(depth - 1).io.input_nxt := EntryBlock.default(dataWidth,rankWidth);
     blocks(0).io.input_prev := EntryBlock.default(dataWidth,rankWidth);
 
+    // 最终的输出等于0号block向前的输出
     blocks(0).io.output_prev <> io.output_entry;
 
     // 计算插入位置
@@ -119,9 +121,9 @@ class PriorityQueueBlock(dataWidth: Int,rankWidth : Int,depth : Int) extends Mod
         is_less(i) := (blocks(i).io.cur_output_entry.rank > io.new_entry.rank); 
     }
     val reverse_is_less = Wire(UInt(depth.W));
-    reverse_is_less := Cat(is_less.reverse);
+    reverse_is_less := Cat(is_less.reverse); // 数组反转并拼接
 
-    val insert_index = PriorityEncoder(reverse_is_less);
+    val insert_index = PriorityEncoder(reverse_is_less); // 找到串中第一个1
 
     // 为每个ShiftRegisterBlock生成标志位
     for (i <- 0 until depth) {
