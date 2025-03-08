@@ -9,53 +9,81 @@ import org.scalatest.flatspec.AnyFlatSpec;
 
 class ShiftRegisterPriorityQueueTest extends AnyFlatSpec with ChiselScalatestTester {
 
-    def dequeue (c : PriorityQueueBlock) : UInt = {
-        c.io.read.poke(true.B);
-        c.io.write.poke(false.B);
-        c.clock.step(1);
-        ()
-    }
-
-    def enqueue (c : PriorityQueueBlock,rank : Int) : UInt = {
-        c.io.write.poke(true.B);
-        c.io.read.poke(false.B);
-        c.io.new_entry.rank.poke(rank.U);
-        c.clock.step(1);
-        ()
-    }
 
     "PriorityQueueBlock" should "enqueue and dequeue entries properly" in {
 
         test(new PriorityQueueBlock(0,4,4)) { c => 
 
-        c.io.output_entry.expect(0xf.U);
-
-        // 入队操作
-        // 初始化信号
-        // c.io.read.poke(false.B)
-        // c.io.write.poke(true.B)
-        // c.io.new_entry.valid.poke(true.B)
-        // c.io.new_entry.bits.address.poke(1.U)
-        // c.io.new_entry.bits.priority.poke(5.U)
-
-        // // 推进时钟
-        // c.clock.step(1)
-
-        // // 检查队列状态
-        // c.io.new_entry.valid.poke(false.B)
-        // c.io.write.poke(false.B)
-        // c.clock.step(1)
-
-        // // 查看队首条目
-        // c.io.read.poke(true.B)
-        // c.clock.step(1)
-        // c.io.output_entry.address.expect(1.U)
-        // c.io.output_entry.priority.expect(5.U)
-
         // 初始态
+        c.io.output_entry.rank.expect(0xf.U);
+
+        // enqueue测试
+
+        // 入队8，现在队列rank为[8，15，15，15]
+        c.io.read.poke(false.B)
+        c.io.write.poke(true.B)
+        c.io.new_entry.rank.poke(8.U);
+        c.clock.step(1);
+        c.io.output_entry.rank.expect(8.U);
+ 
+        // 入队4，现在队列rank为[4,8,15,15]
+        c.io.read.poke(false.B)
+        c.io.write.poke(true.B)
+        c.io.new_entry.rank.poke(4.U);
+        c.clock.step(1);
+        c.io.output_entry.rank.expect(4.U);
+ 
+        // 入队5，现在队列rank为[4,5,8,15]
+        c.io.read.poke(false.B);
+        c.io.write.poke(true.B);
+        c.io.new_entry.rank.poke(5.U);
+        c.clock.step(1);
+        c.io.output_entry.rank.expect(4.U);
+
+        // 入队3，现在队列rank为[3,4,5,8]
+        c.io.read.poke(false.B);
+        c.io.write.poke(true.B);
+        c.io.new_entry.rank.poke(3.U);
+        c.clock.step(1);
+        c.io.output_entry.rank.expect(3.U);
+
+        // 入队6，当前队列rank为[3,4,5,6]
+        c.io.read.poke(false.B);
+        c.io.write.poke(true.B);
+        c.io.new_entry.rank.poke(6.U);
+        c.clock.step(1);
+        c.io.output_entry.rank.expect(3.U);
+ 
+        // dequeue测试
+        c.io.read.poke(false.B);
+        c.io.write.poke(false.B);
+
+        // 出队3，当前队列rank为[4,5,6,15]
+        c.io.read.poke(true.B);
+        c.io.write.poke(false.B);
+        c.clock.step(1);
+        c.io.output_entry.rank.expect(4.U);
         
+        // 出队4，当前队列rank为[5,6,15,15]
+        c.io.read.poke(true.B);
+        c.io.write.poke(false.B);
+        c.clock.step(1);
+        c.io.output_entry.rank.expect(5.U);
 
+        // 出队5，当前队列rank为[6,15,15,15]
+        c.io.read.poke(true.B);
+        c.io.write.poke(false.B);
+        c.clock.step(1);
+        c.io.output_entry.rank.expect(6.U);
 
+        // 出队6，当前队列rank为[15,15,15,15]
+        c.io.read.poke(true.B);
+        c.io.write.poke(false.B);
+        c.clock.step(1);
+        c.io.output_entry.rank.expect(0xf.U);
+        
+        // All test cases passed
+        
         }
     }
 
