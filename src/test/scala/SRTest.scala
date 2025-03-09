@@ -2,6 +2,7 @@ import chisel3._
 import chiseltest._
 import org.scalatest.flatspec.AnyFlatSpec
 import scala.util.Random
+import scala.collection.mutable.PriorityQueue
 
 class SRTest extends  AnyFlatSpec with ChiselScalatestTester {
     "ShiftRegister" should "correct" in {
@@ -41,18 +42,35 @@ class SRTest extends  AnyFlatSpec with ChiselScalatestTester {
                         dut.clock.step()
                         dut.io.highestEntry.rank.expect(65535.U)
                     }
-//                    // 创建一个自定义排序规则的优先级队列（最小堆）
-//                    val minPriorityQueue = PriorityQueue[Int]()(Ordering.Int.reverse)
-//                    minPriorityQueue.enqueue(3)
-//                    minPriorityQueue.enqueue(1)
-//                    minPriorityQueue.enqueue(2)
-//
-//                    // 从最小堆中取出元素
-//                    while (minPriorityQueue.nonEmpty) {
-//                        println("Dequeued from min heap: " + minPriorityQueue.dequeue())
-//                    }
-                }
 
+                }
+            }
+        test(new ShiftRegister(0, 16, 50))
+            .withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+                // 用自带的优先级队列测试
+                val minPriorityQueue = PriorityQueue[Int]()(Ordering.Int.reverse)
+                for (i <- 0 until 100) {
+                    if (Random.nextInt(2) == 1) {
+                        if (minPriorityQueue.size < 50) {
+                            val rank = Random.nextInt(65535)
+                            minPriorityQueue.enqueue(rank)
+                            dut.io.dequeue.poke(false.B)
+                            dut.io.enqueue.poke(true.B)
+                            dut.io.newEntry.rank.poke(rank.U)
+                            dut.io.newEntry.metadata.poke(0)
+                            dut.clock.step()
+                        }
+                    } else {
+                        if (minPriorityQueue.nonEmpty) {
+                            dut.io.highestEntry.rank.expect(minPriorityQueue.dequeue().U)
+                        } else {
+                            dut.io.highestEntry.rank.expect(65535.U)
+                        }
+                        dut.io.dequeue.poke(true.B)
+                        dut.io.enqueue.poke(false.B)
+                        dut.clock.step()
+                    }
+                }
             }
     }
 }
