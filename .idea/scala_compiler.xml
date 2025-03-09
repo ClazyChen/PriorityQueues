@@ -13,5 +13,10 @@
         <plugin path="$USER_HOME$/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/chipsalliance/chisel-plugin_2.13.15/6.6.0/chisel-plugin_2.13.15-6.6.0.jar" />
       </plugins>
     </profile>
+    <profile name="sbt 2" modules="ChiselProject">
+      <plugins>
+        <plugin path="$USER_HOME$/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/edu/berkeley/cs/chisel3-plugin_2.13.14/3.6.1/chisel3-plugin_2.13.14-3.6.1.jar" />
+      </plugins>
+    </profile>
   </component>
 </project>

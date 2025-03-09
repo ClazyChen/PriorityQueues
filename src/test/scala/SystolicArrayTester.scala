@@ -1,14 +1,15 @@
 package SystolicArray
 
 import chisel3._
+import chiseltest.RawTester.test
+import chiseltest._
 import org.scalatest.flatspec.AnyFlatSpec
-import chisel3.simulator.EphemeralSimulator._
 
 
 class SystolicArrayTester extends AnyFlatSpec{
   it should "enqueue and dequeue correctly" in {
     // 使用 priorityWidth = 4, flowWidth = 4, depth = 4 作为测试参数
-    simulate(new SystolicArray(4, 4, 4)){ dut =>
+    test(new SystolicArray(4, 4, 4, 1)){ dut =>
 
       // 初始状态下，存储的 entry 应该为默认值 0
       dut.io.dequeue_Entry.priority.expect(0.U)

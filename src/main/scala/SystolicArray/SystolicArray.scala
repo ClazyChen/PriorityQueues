@@ -4,43 +4,46 @@ import chisel3._
 import chisel3.util._
 
 // 定义 PriorityEntry Bundle，用于存储具有优先级和流标号的条目
-class PriorityEntry(val priorityWidth: Int, val flowWidth: Int) extends Bundle {
+class PriorityEntry(val priorityWidth: Int, val flowWidth: Int, val subWidth: Int) extends Bundle {
   // 定义条目的优先级，位宽为 priorityWidth
   val priority = UInt(priorityWidth.W)
   // 定义条目的流标号，位宽为 flowWidth
   val flowId   = UInt(flowWidth.W)
+  // 定义元素下标，位宽为 subwidth
+  val subscript = UInt(subWidth.W)
 }
 
 // PriorityEntry 的伴生对象，提供一个 default 方法，用于生成默认（全零）条目
 object PriorityEntry {
-  def default(priorityWidth: Int, flowWidth: Int): PriorityEntry = {
-    val flow_element = Wire(new PriorityEntry(priorityWidth, flowWidth))
-    flow_element.priority := 0.U
-    flow_element.flowId   := 0.U
+  def default(priorityWidth: Int, flowWidth: Int, subWidth: Int): PriorityEntry = {
+    val flow_element = Wire(new PriorityEntry(priorityWidth, flowWidth, subWidth))
+    flow_element.priority  := 0.U
+    flow_element.flowId    := 0.U
+    flow_element.subscript := 0.U
     flow_element
   }
 }
 
 // 定义 SystolicArrayBlock 模块，代表 systolic array 中的一个单元块
-class SystolicArrayBlock(priorityWidth: Int, flowWidth: Int) extends Module {
+class SystolicArrayBlock(val priorityWidth: Int, val flowWidth: Int, val subWidth: Int) extends Module {
   // 定义该模块的 IO 接口
   val io = IO(new Bundle{
     val enqueue_Signal      = Input(Bool())       // 入队使能信号，当为 true 时触发入队操作
     val dequeue_Signal      = Input(Bool())       // 出队使能信号，当为 true 时触发出队操作
-    val enqueue_Right_Entry = Input(new PriorityEntry(priorityWidth, flowWidth))    // 来自右侧模块的入队条目
-    val dequeue_Left_Entry  = Input(new PriorityEntry(priorityWidth, flowWidth))    // 来自左侧模块的出队条目（用于更新当前存储条目）
+    val enqueue_Right_Entry = Input(new PriorityEntry(priorityWidth, flowWidth, subWidth))    // 来自右侧模块的入队条目
+    val dequeue_Left_Entry  = Input(new PriorityEntry(priorityWidth, flowWidth, subWidth))    // 来自左侧模块的出队条目（用于更新当前存储条目）
 
 
     val enqueue_Output_Signal = Output(Bool())    // 入队输出使能信号，用于驱动左侧模块的入队操作
     val dequeue_Output_Signal = Output(Bool())    // 出队输出使能信号，用于驱动右侧模块的出队操作
-    val enqueue_Left_Entry    = Output(new PriorityEntry(priorityWidth, flowWidth))  // 向左侧传递的入队条目
-    val dequeue_Right_Entry   = Output(new PriorityEntry(priorityWidth, flowWidth))  // 向右侧传递的出队条目
+    val enqueue_Left_Entry    = Output(new PriorityEntry(priorityWidth, flowWidth, subWidth))  // 向左侧传递的入队条目
+    val dequeue_Right_Entry   = Output(new PriorityEntry(priorityWidth, flowWidth, subWidth))  // 向右侧传递的出队条目
 
-    val stored_Entry = Output(new PriorityEntry(priorityWidth, flowWidth))  // 当前存储的条目，作为该模块的内部状态输出
+    val stored_Entry = Output(new PriorityEntry(priorityWidth, flowWidth, subWidth))  // 当前存储的条目，作为该模块的内部状态输出
   })
 
   // 定义寄存器 entry 用于保存当前条目，初始值为默认（全零）条目
-  val entry = RegInit(PriorityEntry.default(priorityWidth, flowWidth))
+  val entry = RegInit(PriorityEntry.default(priorityWidth, flowWidth, subWidth))
 
   io.stored_Entry := entry
   io.enqueue_Output_Signal := false.B
@@ -80,19 +83,19 @@ class SystolicArrayBlock(priorityWidth: Int, flowWidth: Int) extends Module {
 }
 
 // 定义顶层 SystolicArray 模块，由多个 SystolicArrayBlock 级联组成
-class SystolicArray(val priorityWidth: Int, val flowWidth: Int, val depth: Int) extends Module {
+class SystolicArray(val priorityWidth: Int, val flowWidth: Int, val depth: Int, val subWidth: Int) extends Module {
   // 定义顶层模块的 IO 接口
   val io = IO(new Bundle {
     val enqueue_Signal = Input(Bool())  // 入队使能信号（外部输入）
     val dequeue_Signal = Input(Bool())  // 出队使能信号（外部输入）
-    val enqueue_Entry  = Input(new PriorityEntry(priorityWidth, flowWidth))  // 入队条目（外部输入）
-    val dequeue_Entry  = Output(new PriorityEntry(priorityWidth, flowWidth)) // 出队条目（外部输出），输出来自某个级联模块的当前条目
+    val enqueue_Entry  = Input(new PriorityEntry(priorityWidth, flowWidth, subWidth))  // 入队条目（外部输入）
+    val dequeue_Entry  = Output(new PriorityEntry(priorityWidth, flowWidth, subWidth)) // 出队条目（外部输出），输出来自某个级联模块的当前条目
 
-    val data_check     = Output(Vec(depth, new PriorityEntry(priorityWidth, flowWidth)))  // 调试输出，显示整个 systolic array 中每个模块当前存储的条目
+    val data_check     = Output(Vec(depth, new PriorityEntry(priorityWidth, flowWidth, subWidth)))  // 调试输出，显示整个 systolic array 中每个模块当前存储的条目
   })
 
   // 实例化一个深度为 depth 的 SystolicArrayBlock 向量，每个块的 IO 被保存在 modules 中
-  val modules = VecInit(Seq.fill(depth)(Module(new SystolicArrayBlock(priorityWidth, flowWidth)).io))
+  val modules = VecInit(Seq.fill(depth)(Module(new SystolicArrayBlock(priorityWidth, flowWidth, subWidth)).io))
 
   // 将各模块当前存储的条目通过 data_check 输出，便于调试观察
   for(i <- 0 until depth) {
@@ -109,7 +112,7 @@ class SystolicArray(val priorityWidth: Int, val flowWidth: Int, val depth: Int) 
   modules(0).dequeue_Left_Entry  := modules(1).dequeue_Right_Entry
 
   // 对最后一个模块的 dequeue_Left_Entry 赋予默认值，确保所有输入均被初始化
-  modules(depth-1).dequeue_Left_Entry := PriorityEntry.default(priorityWidth, flowWidth)
+  modules(depth-1).dequeue_Left_Entry := PriorityEntry.default(priorityWidth, flowWidth, subWidth)
 
   // 将顶层的出队条目连接到第 0 个模块的存储条目
   io.dequeue_Entry := modules(0).stored_Entry
