@@ -5,7 +5,7 @@ import chiseltest.RawTester.test
 import chiseltest._
 import org.scalatest.flatspec.AnyFlatSpec
 
-class ModifiedSystolicArray extends AnyFlatSpec{
+class ModifiedSystolicArrayTester extends AnyFlatSpec{
   it should "ModifiedSystolicArrayPriorityQueue should enqueue and dequeue correctly" in {
     test(new ModifiedSystolicArrayBlock(8, 8, 8, 1)) { c =>
       // 子任务1: 检测每个模块内是否可以完成正确的入队和出队操作
