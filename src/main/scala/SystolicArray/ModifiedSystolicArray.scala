@@ -80,8 +80,8 @@ class ModifiedSystolicArrayBlock(val priorityWidth: Int, val flowWidth: Int, val
     // 在出队模式下，用于从左侧模块获取到邻接的元素，在模块0～length-2中，应与其左侧的block_dequeue_
     val dequeue_Shift_Left_Entry  = Input(new PriorityEntry(priorityWidth, flowWidth, subWidth))
 
-    val block_output_enqueue_Signal = Output(Bool())
-    val block_output_dequeue_Signal = Output(Bool())
+    val block_output_enqueue_Signal = Output(Bool())      // 用于向左侧的模块传递入队信号
+    val block_output_dequeue_Signal = Output(Bool())      // 用于向左侧的模块传递出队信号
   })
 
   // 实例化一组ShiftBlocks
@@ -182,7 +182,7 @@ class ModifiedSystolicArrayPriorityQueue(val priorityWidth: Int, val flowWidth: 
 //  val data_check = Output(Vec(depth, new PriorityEntry(priorityWidth, flowWidth)))
   modules(0).block_enqueue_Signal := io.enqueue_Signal
   modules(0).block_dequeue_Signal := io.dequeue_Signal
-  modules(0).block_enqueue_entry := io.enqueue_Entry
+  modules(0).block_enqueue_entry  := io.enqueue_Entry
   io.dequeue_Entry := modules(0).block_dequeue_entry
 
   for(i <- 1 until length) {
