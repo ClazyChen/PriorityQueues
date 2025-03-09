@@ -17,7 +17,6 @@ class SRtest extends AnyFlatSpec with ChiselScalatestTester {
   }
 
   def hazard(dut: ShiftRegister) = {
-    // hazard (simultaneous enqueue and dequeue)
     dut.io.read.poke(true.B)
     dut.io.write.poke(true.B)
     dut.io.new_entry.rank.poke(1.U)
@@ -26,6 +25,7 @@ class SRtest extends AnyFlatSpec with ChiselScalatestTester {
 
   "ShiftRegister" should "pass" in {
     test(new ShiftRegister(0, 4, 4)) { dut =>
+      // null, 默认优先级是b1111
       dut.io.output.rank.expect(15.U)
 
       // 1

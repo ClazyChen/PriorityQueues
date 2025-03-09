@@ -15,6 +15,7 @@ object Entry {
   }
 }
 
+// 每个block存储一个entry,通过left和right与相邻block通信
 class Block(dataWidth: Int, rankWidth: Int) extends Module {
   val io = IO(new Bundle {
     val read = Input(Bool())
@@ -28,6 +29,7 @@ class Block(dataWidth: Int, rankWidth: Int) extends Module {
   val entry = RegInit(Entry.default(dataWidth, rankWidth))
   io.output := entry
 
+  // 高优先级的block(rank较小的)放在右边
   when(io.read && !io.write) {
     // dequeue操作,entry依次右移
     entry := io.left
@@ -52,7 +54,6 @@ class ShiftRegister(dataWidth: Int, rankWidth: Int, blocksNum: Int)
   })
 
   val blocks = Seq.fill(blocksNum)(Module(new Block(dataWidth, rankWidth)))
-  io.output := blocks(0).io.output
   blocks(0).io.right := Entry.default(dataWidth, rankWidth)
   // 0th block右侧entry优先级设为最高
   blocks(0).io.right.rank := 0.U
@@ -71,9 +72,7 @@ class ShiftRegister(dataWidth: Int, rankWidth: Int, blocksNum: Int)
       blocks(i).io.left := blocks(i + 1).io.output
     }
   }
-}
 
-object Main extends App {
-  println("Hello Chisel World")
-  emitVerilog(new ShiftRegister(4, 4, 4))
+  io.output := blocks(0).io.output
+
 }
