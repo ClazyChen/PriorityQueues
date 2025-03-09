@@ -5,7 +5,7 @@ import chisel3.util._
 
 class ShiftRegisterBlock(val priorityWidth: Int, val flowWidth: Int, val subWidth: Int) extends Module {
   val io = IO(new Bundle{
-    val new_Entry      = Input(new PriorityEntry(priorityWidth, flowWidth, subWidth))        // 入队时，通过全局总线接收的新条目
+    val new_Entry      = Input(new PriorityEntry(priorityWidth, flowWidth, subWidth))               // 入队时，通过全局总线接收的新条目
     val enqueue_Signal = Input(Bool())                                                              // 入队操作使能信号（当 enq 有效且 deq 未激活时进入入队逻辑）
     val dequeue_Signal = Input(Bool())                                                              // 出队操作使能信号（当deq 有效时进入出队逻辑）
 
@@ -21,23 +21,22 @@ class ShiftRegisterBlock(val priorityWidth: Int, val flowWidth: Int, val subWidt
   })
 
   val entry = RegInit(PriorityEntry.default(priorityWidth, flowWidth, subWidth))
-  val next_Entry = RegInit(PriorityEntry.default(priorityWidth, flowWidth, subWidth))
 
+  io.stored_entry := entry
   io.shift_Flag_Out := false.B
   io.dequeue_Right_Entry  := entry
   io.enqueue_Left_Entry := entry
-  next_Entry := entry
 
   when(io.enqueue_Signal) {
     // 入队操作：局部决策逻辑
     // 只有当来自右侧模块未发生移位且新条目有效时，
     // 若新条目的优先级高于当前条目，则本模块锁存新条目，并将原条目作为移位数据输出给左侧模块。
-    when(!io.shift_Flag_In && (io.new_Entry.priority >= entry.priority)) {
+    when(!io.shift_Flag_In && (io.new_Entry.priority <= entry.priority)) {
       io.shift_Flag_Out := true.B
-      when(io.new_Entry.priority > entry.priority) {
+      when(io.new_Entry.priority < entry.priority) {
         // 当新条目的优先级大于原条目时
         // 锁存新条目，同时输出原条目实现向左侧模块移位
-        next_Entry := io.new_Entry
+        entry := io.new_Entry
       }.otherwise {
         // 当新条目的优先级等于原条目时
         // 比较二者的下标并决定移位元素
@@ -48,24 +47,22 @@ class ShiftRegisterBlock(val priorityWidth: Int, val flowWidth: Int, val subWidt
         }.otherwise {
           // 当原条目的下标更大时
           // 原条目作为左移条目，新条目成为entry
-          next_Entry := io.new_Entry
+          entry := io.new_Entry
         }
       }
     }.elsewhen(io.shift_Flag_In) {
       // 如果本模块的右侧模块已锁存新条目，则本模块从右侧接收移位数据，实现条目向左移动
       io.shift_Flag_Out := true.B
-      next_Entry := io.enqueue_Right_Entry
+      entry := io.enqueue_Right_Entry
     } .otherwise {
       // 否则保持当前条目不变
     }
   } .elsewhen(io.dequeue_Signal) {
     // 出队操作：模块0的条目将被读取，而其他模块则从左侧模块接收数据，实现所有条目向右移动
-    next_Entry := io.dequeue_Left_Entry
+    entry := io.dequeue_Left_Entry
   } .otherwise {
     // 否则保持当前条目不变
   }
-  entry := next_Entry
-  io.stored_entry := next_Entry
 }
 
 class ModifiedSystolicArrayBlock(val priorityWidth: Int, val flowWidth: Int, val depth: Int, val subWidth: Int) extends Module {
@@ -90,7 +87,7 @@ class ModifiedSystolicArrayBlock(val priorityWidth: Int, val flowWidth: Int, val
   // 实例化一组ShiftBlocks
   // 维护entry_counter用于记录当前block中的元素个数
   val shiftblocks = VecInit(Seq.fill(depth)(Module(new ShiftRegisterBlock(priorityWidth, flowWidth, subWidth)).io))
-  val entry_counter = RegInit(0.U(log2Ceil(depth).W))
+  val entry_counter = RegInit(0.U(depth.W))
 
   for(i <- 0 until depth) {
     io.data_check(i) := shiftblocks(i).stored_entry
@@ -134,7 +131,7 @@ class ModifiedSystolicArrayBlock(val priorityWidth: Int, val flowWidth: Int, val
   // ---------------------------------------------------------------------------------------
 
   when(io.block_enqueue_Signal) {
-    when(entry_counter < depth.U - 1.U) {
+    when(entry_counter < depth.U) {
       // 当前模块未满时，溢出元素默认为最左侧的元素
       // 新入队的元素有机会插入该模块的任意一个block中
       for(i <- 0 until depth) {
@@ -143,14 +140,14 @@ class ModifiedSystolicArrayBlock(val priorityWidth: Int, val flowWidth: Int, val
       }
       io.enqueue_Shift_Left_Entry := shiftblocks(depth-1).stored_entry
       entry_counter := entry_counter + 1.U
-    } .elsewhen(entry_counter === depth.U - 1.U) {
+    } .elsewhen(entry_counter === depth.U) {
       // 当前模块已满时，有以下两种情况：
       // 情况1: 如果新入队的元素无法插入到当前模块，则溢出元素为新入队的元素
       // 情况2: 如果新入队的元素有机会插入该模块，则溢出元素为最左侧的元素
-      when(io.block_enqueue_entry.priority <= shiftblocks(depth-1).stored_entry.priority) {
+      when(io.block_enqueue_entry.priority >= shiftblocks(depth-1).stored_entry.priority) {
         // 当情况1发生时，模块不执行入队操作，将新入队的元素直接赋给溢出元素
         io.enqueue_Shift_Left_Entry := io.block_enqueue_entry
-      } .elsewhen(io.block_enqueue_entry.priority > shiftblocks(depth-1).stored_entry.priority) {
+      } .elsewhen(io.block_enqueue_entry.priority < shiftblocks(depth-1).stored_entry.priority) {
         // 当情况2发生时，模块执行入队操作，并将最左侧block的输出元素赋给溢出元素
         for(i <- 0 until depth) {
           shiftblocks(i).new_Entry := io.block_enqueue_entry
