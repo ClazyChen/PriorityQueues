@@ -339,3 +339,20 @@ project/plugins/project/
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
 
+
+# build
+**/target
+**/project
+**/verilog
+**/test_run_dir
+
+# IDE
+.github
+.vscode
+.idea
+.DS_Store
+
+# verilog
+*.v
+*.sv
+
