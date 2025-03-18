@@ -6,7 +6,7 @@ import fpga._
 import fpga.Const._
 
 // top-module : PriorityQueue Block
-class PriorityQueue extends Module with PriorityQueueTrait {
+class PriorityQueueSR extends Module with PriorityQueueTrait {
     
     // 实现trait中定义的IO接口 
     val io = IO(new PQIO)
@@ -28,6 +28,11 @@ class PriorityQueue extends Module with PriorityQueueTrait {
 
     // 无关端口赋值
     blocks(count_of_entries - 1).io.next_entry_in := Entry.default
+    blocks(0).io.prev_entry_in := DontCare
+
     blocks(count_of_entries - 1).io.next_cmp_in := true.B
+    blocks(0).io.prev_cmp_in := false.B
+    // 模块输出
+    io.entry_out := blocks(0).io.entry_out
 
 }

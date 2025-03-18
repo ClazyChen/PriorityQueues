@@ -5,6 +5,6 @@
 // import fpga._
 // import fpga.Const._
 
-// class Block extends Module {
+// class PriorityQueueSA extends Module with PriorityQueueTrait {
 
 // }

@@ -12,7 +12,7 @@ class Entry extends Bundle{
     val rank = UInt(rank_width.W)           // rank (priority)
 
     // compare two entries by their rank
-    def <(that : Entry) : Bool = (this.rank < that.rank) || !that.existing
+    def < (that : Entry) : Bool = (this.rank < that.rank) || !that.existing
 }
 
 // the default entry (invalid entry)
