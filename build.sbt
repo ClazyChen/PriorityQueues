@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 scalacOptions ++= Seq(
   "-deprecation",
   "-feature",
@@ -5,6 +6,11 @@ scalacOptions ++= Seq(
   // "-Xfatal-warnings",
   "-language:reflectiveCalls",
 )
+=======
+ThisBuild / scalaVersion     := "2.13.10"
+ThisBuild / version          := "0.1.0"
+ThisBuild / organization     := "com.github.yarasite"
+>>>>>>> Stashed changes
 
 scalaVersion := "2.13.14"
 val chiselVersion = "3.6.1"
