@@ -10,6 +10,9 @@ scalacOptions ++= Seq(
 ThisBuild / scalaVersion     := "2.13.10"
 ThisBuild / version          := "0.1.0"
 ThisBuild / organization     := "com.github.yarasite"
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 
 scalaVersion := "2.13.14"
