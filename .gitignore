@@ -1,0 +1,16 @@
+
+# build
+**/target
+**/project
+**/verilog
+**/test_run_dir
+
+# IDE
+.github
+.vscode
+.idea
+.DS_Store
+
+# verilog
+*.v
+*.sv
