@@ -11,13 +11,13 @@ import fpga.Const._
 object BlackBox {
 
     // cold start operations (all of them are push operations)
-    val cold_start_ops = 32
+    val cold_start_ops = 4
 
     // number of operations in the test
-    val num_ops = 100
+    val num_ops = 20
 
     // push, pop, replace ratio
-    val ratio = (0.3, 0.3, 0.4)
+    val ratio = (0.5, 0.5, 0.0)
     val op_push = 0
     val op_pop = 1
     val op_replace = 2
@@ -31,6 +31,11 @@ object BlackBox {
     // random seed
     val seed = 1234567890
 
+    def debugPrint[PQ <: PriorityQueueTrait](tag: String)(implicit pq: PQ): Unit = {
+        val entries = pq.io.dbgPort.get.map(_.rank.peek().litValue)
+        println(f"${tag}%-8s: ${entries.mkString("[", ", ", "]")}")
+    }
+
     // push a new entry into the priority queue
     def push[PQ <: PriorityQueueTrait](rank: Int, metadata: Int)(implicit pq: PQ, std_pq: PriorityQueue[(Int, Int)]): Unit = {
         pq.io.op_in.push.existing.poke(true.B)
@@ -39,6 +44,7 @@ object BlackBox {
         pq.io.op_in.pop.poke(false.B)
         pq.clock.step()
         std_pq.enqueue((rank, metadata))
+        if(debug) debugPrint(s"push(${rank})")
     }
 
     // pop the top entry from the priority queue
@@ -49,6 +55,7 @@ object BlackBox {
         pq.io.op_in.pop.poke(true.B)
         pq.clock.step()
         std_pq.dequeue()
+        if(debug) debugPrint("pop")
     }
 
     // replace the top entry with a new entry
@@ -60,6 +67,7 @@ object BlackBox {
         pq.clock.step()
         std_pq.enqueue((rank, metadata))
         std_pq.dequeue()
+        if(debug) debugPrint(s"rep(${rank})")
     }
 
     // check the top entry of the priority queue

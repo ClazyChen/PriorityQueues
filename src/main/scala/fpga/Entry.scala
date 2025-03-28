@@ -47,6 +47,7 @@ trait PriorityQueueTrait extends Module {
     class PQIO extends Bundle {
         val op_in = Input(new Operator)
         val entry_out = Output(new Entry)
+        val dbgPort = if (debug) Some(Output(Vec(count_of_entries, new Entry))) else None
     }
 
     val io: PQIO

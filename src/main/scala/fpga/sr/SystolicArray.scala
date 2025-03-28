@@ -51,6 +51,13 @@ class SystolicArray extends Module with PriorityQueueTrait {
     for(i <- 0 until count_of_entries - 1) {
         blocks(i) -> blocks(i + 1)
     }
-    blocks.last.io.next_entry_in := DontCare
+    blocks.last.io.next_entry_in := Entry.default
+
+    // Connect debug port if enabled
+    if(debug) {
+        io.dbgPort.foreach { dbgPort =>
+            dbgPort := blocks.map(_.io.entry_out)
+        }
+    }
 
 }
