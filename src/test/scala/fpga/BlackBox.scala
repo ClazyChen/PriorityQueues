@@ -17,6 +17,7 @@ object BlackBox {
     val num_ops = 20
 
     // push, pop, replace ratio
+    // val ratio = (1.0, 0.0, 0.0)
     val ratio = (0.5, 0.5, 0.0)
     val op_push = 0
     val op_pop = 1
@@ -53,9 +54,9 @@ object BlackBox {
         pq.io.op_in.push.rank.poke(-1.S(rank_width.W).asUInt)
         pq.io.op_in.push.metadata.poke(0.U)
         pq.io.op_in.pop.poke(true.B)
-        pq.clock.step()
-        std_pq.dequeue()
+        pq.clock.step(2)
         if(debug) debugPrint("pop")
+        std_pq.dequeue()
     }
 
     // replace the top entry with a new entry
