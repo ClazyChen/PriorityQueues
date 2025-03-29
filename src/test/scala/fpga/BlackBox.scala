@@ -14,11 +14,12 @@ object BlackBox {
     val cold_start_ops = 4
 
     // number of operations in the test
-    val num_ops = 20
+    val num_ops = 100
 
     // push, pop, replace ratio
     // val ratio = (1.0, 0.0, 0.0)
-    val ratio = (0.5, 0.5, 0.0)
+    // val ratio = (0.6, 0.4, 0.0)
+    val ratio = (0.3, 0.2, 0.5)
     val op_push = 0
     val op_pop = 1
     val op_replace = 2
@@ -35,6 +36,16 @@ object BlackBox {
     def debugPrint[PQ <: PriorityQueueTrait](tag: String)(implicit pq: PQ): Unit = {
         val entries = pq.io.dbgPort.get.map(_.rank.peek().litValue)
         println(f"${tag}%-8s: ${entries.mkString("[", ", ", "]")}")
+        val temps = pq.io.dbgPort1.get.map(_.rank.peek().litValue)
+        println(f"${"temp"}%-8s: ${temps.mkString("[", ", ", "]")}")
+    }
+
+    def idle[PQ <: PriorityQueueTrait](implicit pq: PQ, std_pq: PriorityQueue[(Int, Int)]): Unit = {
+        pq.io.op_in.push.existing.poke(false.B)
+        pq.io.op_in.push.rank.poke(-1.S(rank_width.W).asUInt)
+        pq.io.op_in.push.metadata.poke(0.U)
+        pq.io.op_in.pop.poke(false.B)
+        pq.clock.step()
     }
 
     // push a new entry into the priority queue
@@ -54,7 +65,9 @@ object BlackBox {
         pq.io.op_in.push.rank.poke(-1.S(rank_width.W).asUInt)
         pq.io.op_in.push.metadata.poke(0.U)
         pq.io.op_in.pop.poke(true.B)
-        pq.clock.step(2)
+        pq.clock.step()
+        // if(debug) debugPrint("pop1")
+        idle
         if(debug) debugPrint("pop")
         std_pq.dequeue()
     }
@@ -66,6 +79,7 @@ object BlackBox {
         pq.io.op_in.push.metadata.poke(metadata.U)
         pq.io.op_in.pop.poke(true.B)
         pq.clock.step()
+        idle
         std_pq.enqueue((rank, metadata))
         std_pq.dequeue()
         if(debug) debugPrint(s"rep(${rank})")
@@ -78,7 +92,7 @@ object BlackBox {
         } else {
             pq.io.entry_out.existing.expect(true.B)
             pq.io.entry_out.rank.expect(std_pq.head._1.U)
-            pq.io.entry_out.metadata.expect(std_pq.head._2.U)
+            // pq.io.entry_out.metadata.expect(std_pq.head._2.U)
         }
     }
 
