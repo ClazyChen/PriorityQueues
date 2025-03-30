@@ -1,54 +1,45 @@
 package fpga.sr
 
 import chisel3._
-import chisel3.util._
-import fpga._
 import fpga.Const._
+import fpga._
 
-// a block in the shift register
-class Block extends Module {
+class Block extends Module{
     val io = IO(new Bundle {
         val op_in = Input(new Operator)
         val prev_entry_in = Input(new Entry)
         val next_entry_in = Input(new Entry)
         val prev_cmp_in = Input(Bool())
         val next_cmp_in = Input(Bool())
-        val cmp_out = Output(Bool())
         val entry_out = Output(new Entry)
+        val cmp_out = Output(Bool())
     })
 
-    // the entry stored in the block
     val entry = RegInit(Entry.default)
+    val cmp = Wire(Bool()) // 比较结果
+    cmp := io.op_in.push < entry
+    io.cmp_out := cmp
     io.entry_out := entry
 
-    // the comparison result
-    val cmp = io.op_in.push < entry
-    io.cmp_out := cmp
-    
-    // update the entry
-    when (io.op_in.pop) {
-        // for pop and replace operation
-        // 1. shift-left : e'(i) = e(i+1) , when cmp = 0 and cmp(i+1) = 0
-        // 2. replace    : e'(i) = push   , when cmp = 0 and cmp(i+1) = 1
-        // 3. no change  : e'(i) = e(i)  , otherwise
-        when (!cmp) {
+    //    when(io.op_in.pop && !io.op_in.push.existing) {
+    //        entry := io.next_entry_in
+    //    }.elsewhen(!io.op_in.pop && io.op_in.push.existing) {
+    //        when (cmp) {
+    //            entry := Mux(io.prev_cmp_in, io.prev_entry_in, io.op_in.push)
+    //        }
+    //    }.elsewhen(io.op_in.pop && io.op_in.push.existing) {
+    //        when (!cmp) {
+    //            entry := Mux(io.next_cmp_in, io.op_in.push, io.next_entry_in)
+    //        }
+    //    }
+
+    when(io.op_in.pop) {
+        when(!cmp) {
             entry := Mux(io.next_cmp_in, io.op_in.push, io.next_entry_in)
         }
-    } .otherwise {
-        // for push operation
-        // 1. shift-right : e'(i) = e(i-1) , when cmp = 1 and cmp(i-1) = 1
-        // 2. replace     : e'(i) = push   , when cmp = 1 and cmp(i-1) = 0
-        // 3. no change   : e'(i) = e(i)  , otherwise
-        when (cmp) {
+    }.otherwise {
+        when(cmp) {
             entry := Mux(io.prev_cmp_in, io.prev_entry_in, io.op_in.push)
         }
-    }
-
-    // connect blocks, this ~> next
-    def ~>(next: Block) = {
-        next.io.prev_entry_in := this.io.entry_out
-        next.io.prev_cmp_in := this.io.cmp_out
-        this.io.next_entry_in := next.io.entry_out
-        this.io.next_cmp_in := next.io.cmp_out
     }
 }
