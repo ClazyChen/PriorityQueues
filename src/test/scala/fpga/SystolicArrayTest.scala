@@ -17,16 +17,14 @@ class SystolicArrayTest extends AnyFlatSpec with ChiselScalatestTester {
         dut.io.op_in.push.existing.poke(true.B)
         dut.io.op_in.push.metadata.poke(metadata)
         dut.io.op_in.push.rank.poke(rank)
-        dut.clock.step(150)
+        dut.clock.step(100)
         dut.io.entry_out.rank.expect(expected_rank)
     }
     // 定义出队操作
     def dequeue(dut : PriorityQueueSA,expected_rank : UInt) : Unit = {
         dut.io.op_in.pop.poke(true.B)
         dut.io.op_in.push.existing.poke(false.B)
-        dut.io.op_in.push.metadata.poke(0.U)
-        dut.io.op_in.push.rank.poke(-1.S(rank_width.W).asUInt)
-        dut.clock.step(1)
+        dut.clock.step(100)
         dut.io.entry_out.rank.expect(expected_rank)
     }
 
@@ -34,6 +32,9 @@ class SystolicArrayTest extends AnyFlatSpec with ChiselScalatestTester {
       test(new PriorityQueueSA).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
 
         // 先进行手动验证
+        dut.io.op_in.push.existing.poke(false.B)
+        dut.io.op_in.pop.poke(false.B)
+
         // 验证初态
         dequeue(dut,-1.S(rank_width.W).asUInt)
         dequeue(dut,-1.S(rank_width.W).asUInt)
@@ -47,7 +48,7 @@ class SystolicArrayTest extends AnyFlatSpec with ChiselScalatestTester {
 
         // 验证出队操作
         dequeue(dut,2.U(rank_width.W))
-
+        
 
 
       }

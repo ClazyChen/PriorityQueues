@@ -22,8 +22,10 @@ class PriorityQueueSA extends Module with PriorityQueueTrait {
     // 无关端口赋值
     blocks(count_of_entries - 1).io.next_entry_in := Entry.default
 
-    // 连接到外部
+    // 连接到上级模块
     io.entry_out := blocks(0).io.entry_out
     blocks(0).io.op_in := io.op_in
+
+    
 
 }
