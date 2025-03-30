@@ -28,10 +28,21 @@ class SystolicArrayTest extends AnyFlatSpec with ChiselScalatestTester {
         dut.io.entry_out.rank.expect(expected_rank)
     }
 
+    // 定义replace操作
+    def replace(dut : PriorityQueueSA,metadata : UInt,rank : UInt,expected_rank : UInt) : Unit = {
+        dut.io.op_in.pop.poke(true.B)
+        dut.io.op_in.push.existing.poke(true.B)
+        dut.io.op_in.push.metadata.poke(metadata)
+        dut.io.op_in.push.rank.poke(rank)
+        dut.clock.step(1)
+        dut.io.entry_out.rank.expect(expected_rank)
+    }
+
+
     "PriorityQueue" should "enqueue and dequeue properly" in {
       test(new PriorityQueueSA).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
 
-        // 先进行手动验证
+        // 还是先进行手动验证，用手动模拟结果和实际结果对比
         dut.io.op_in.push.existing.poke(false.B)
         dut.io.op_in.pop.poke(false.B)
 
@@ -44,12 +55,15 @@ class SystolicArrayTest extends AnyFlatSpec with ChiselScalatestTester {
         enqueue(dut,3.U(metadata_width.W),3.U(rank_width.W),3.U(rank_width.W))
         enqueue(dut,2.U(metadata_width.W),2.U(rank_width.W),2.U(rank_width.W))
         enqueue(dut,8.U(metadata_width.W),8.U(rank_width.W),2.U(rank_width.W))
-        enqueue(dut,1.U(metadata_width.W),1.U(rank_width.W),1.U(rank_width.W))
+
+        // 验证replace操作
+        replace(dut,1.U(metadata_width.W),1.U(rank_width.W),2.U(rank_width.W)) // 最小的元素刚入队就被pop出
+        replace(dut,4.U(metadata_width.W),4.U(rank_width.W),3.U(rank_width.W))
+        replace(dut,7.U(metadata_width.W),7.U(rank_width.W),4.U(rank_width.W))
 
         // 验证出队操作
-        dequeue(dut,2.U(rank_width.W))
-        dequeue(dut,3.U(rank_width.W))
         dequeue(dut,5.U(rank_width.W))
+        dequeue(dut,7.U(rank_width.W))
         dequeue(dut,8.U(rank_width.W))
         dequeue(dut,-1.S(rank_width.W).asUInt)
 
@@ -83,7 +97,11 @@ class SystolicArrayTest extends AnyFlatSpec with ChiselScalatestTester {
               dequeue(dut,-1.S(rank_width.W).asUInt)
               println("empty queue!")
           }
-
+          // 验证replace(push-pop)
+          enqueue(dut,0.U(metadata_width.W),1.U(rank_width.W),1.U(rank_width.W)) // 先在空队列里插入一个元素
+          for(i <- 0 until 30) {
+              replace(dut,0.U(metadata_width.W),(i + 2).U(rank_width.W),(i + 2).U(rank_width.W))
+          }
 
         }
       }
