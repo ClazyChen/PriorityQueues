@@ -11,7 +11,7 @@ import fpga.Const._
 object BlackBox {
 
     // cold start operations (all of them are push operations)
-    val cold_start_ops = 4
+    val cold_start_ops = 10
 
     // number of operations in the test
     val num_ops = 100
@@ -34,9 +34,9 @@ object BlackBox {
     val seed = 1234567890
 
     def debugPrint[PQ <: PriorityQueueTrait](tag: String)(implicit pq: PQ): Unit = {
-        val entries = pq.io.dbgPort.get.map(_.rank.peek().litValue)
+        val entries = pq.io.dbg_port.get.map(_.rank.peek().litValue)
         println(f"${tag}%-8s: ${entries.mkString("[", ", ", "]")}")
-        val temps = pq.io.dbgPort1.get.map(_.rank.peek().litValue)
+        val temps = pq.io.dbg_port1.get.map(_.rank.peek().litValue)
         println(f"${"temp"}%-8s: ${temps.mkString("[", ", ", "]")}")
     }
 

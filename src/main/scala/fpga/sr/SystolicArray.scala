@@ -23,11 +23,11 @@ class SystolicArray extends Module with PriorityQueueTrait {
     blocks.last.io.next_entry_in := Entry.default
 
     if(debug) {
-        io.dbgPort.foreach { dbgPort =>
-            dbgPort := blocks.map(_.io.entry_out)
+        io.dbg_port.foreach { dbg_port =>
+            dbg_port := blocks.map(_.io.entry_out)
         }
-        io.dbgPort1.foreach { dbgPort =>
-            dbgPort := blocks.map(_.io.temp_out)
+        io.dbg_port1.foreach { dbg_port =>
+            dbg_port := blocks.map(_.io.temp_out)
         }
 
     }

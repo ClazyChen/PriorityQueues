@@ -15,13 +15,10 @@ class SystolicBlock extends Module {
         val temp_out = Output(new Entry)
     })
 
-    // 测试过程中存在以下问题：
-    // 如果每个block都含有元素，就可能导致溢出问题，但是因为含有temp，所以实际能存储的元素大于count_of_entries
-    // SystolicArray满时，软件测试的结果不一定可靠
     val entry = RegInit(Entry.default)
     val temp = RegInit(Entry.default)
 
-    val op = RegInit(Operator.default)
+    val op = Wire(new Operator)
 
     io.entry_out := entry
     io.op_out.push := temp
@@ -30,46 +27,26 @@ class SystolicBlock extends Module {
     val cmp = io.op_in.push < entry
 
     def min(a: Entry, b: Entry, c: Entry): Entry = {
-        // 第一阶段比较前两个Entry
         val minAB = Mux(a < b, a, b)
-        
-        // 第二阶段比较中间结果与第三个Entry
         Mux(minAB < c, minAB, c)
     }
 
-
-
     when(io.op_in.pop) {
-        // 假设没有replace
         when(io.op_in.push.existing) {
-            when(io.op_in.push < entry) {
-                temp := Entry.default
-                op.push := Entry.default
-                op.pop := false.B
-            } .otherwise {
-                entry := min(io.op_in.push, temp, io.next_entry_in)
-                temp := io.op_in.push
-                op.push := io.op_in.push
-                op.pop := true.B
-            }
+            entry := Mux(cmp, entry, min(io.op_in.push, temp, io.next_entry_in))
         } .otherwise {
             entry := Mux(temp < io.next_entry_in, temp, io.next_entry_in)
-            temp := Entry.default
-            op.push := Entry.default
-            op.pop := true.B
         }
+        op.push := Mux(io.op_in.push.existing && !cmp, io.op_in.push, Entry.default)
+        op.pop := Mux(cmp, false.B, true.B)
     } .otherwise {
-        when(cmp) {
-            temp := entry
-            op.push := entry
-            entry := io.op_in.push
-        } .otherwise {
-            temp := io.op_in.push
-            op.push := io.op_in.push
-        }
+        op.push := Mux(cmp, entry, io.op_in.push)
+        entry := Mux(cmp, io.op_in.push, entry)
         op.pop := false.B
     }
-
+    
+    // op.pop := io.op_in.pop && io.op_in.push.existing && !cmp || io.op_in.pop && !io.op_in.push.existing
+    temp := op.push
     io.op_out := op
 
     def ->(next: SystolicBlock) = {
