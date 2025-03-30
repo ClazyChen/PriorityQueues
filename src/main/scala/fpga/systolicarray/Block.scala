@@ -28,9 +28,6 @@ class Block extends Module {
     io.op_out.push := Entry.default
     io.op_out.pop := false.B
     io.entry_out := entry_holder
-    
-    // 计算用于传递的状态
-    val next_entry_state = Wire(new Entry) // 超前计算传递出去的状态
 
     // 用变量保存rank比较状态
     val cmp_status = io.op_in.push < entry_holder
@@ -38,6 +35,7 @@ class Block extends Module {
     // decision logic
     when (io.op_in.push.existing) { // 对应push操作，先不实现replace操作
         when(cmp_status) { // cmp_status 为 true时
+            val next_entry_state = Wire(new Entry) // 超前计算传递出去的状态
             next_entry_state.existing := entry_holder.existing
             next_entry_state.metadata := entry_holder.metadata
             next_entry_state.rank := entry_holder.rank
@@ -47,6 +45,7 @@ class Block extends Module {
             io.op_out.pop := false.B
         }
         .otherwise { // cmp_status 为 false时
+            val next_entry_state = Wire(new Entry) // 超前计算传递出去的状态
             next_entry_state.existing := io.op_in.push.existing
             next_entry_state.metadata := io.op_in.push.metadata
             next_entry_state.rank := io.op_in.push.rank
@@ -63,5 +62,6 @@ class Block extends Module {
     .otherwise {
         // do nothing
     }
+    
 
 }                                                                            

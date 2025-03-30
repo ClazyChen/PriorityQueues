@@ -17,14 +17,14 @@ class SystolicArrayTest extends AnyFlatSpec with ChiselScalatestTester {
         dut.io.op_in.push.existing.poke(true.B)
         dut.io.op_in.push.metadata.poke(metadata)
         dut.io.op_in.push.rank.poke(rank)
-        dut.clock.step(100)
+        dut.clock.step(1)
         dut.io.entry_out.rank.expect(expected_rank)
     }
     // 定义出队操作
     def dequeue(dut : PriorityQueueSA,expected_rank : UInt) : Unit = {
         dut.io.op_in.pop.poke(true.B)
         dut.io.op_in.push.existing.poke(false.B)
-        dut.clock.step(100)
+        dut.clock.step(1)
         dut.io.entry_out.rank.expect(expected_rank)
     }
 
@@ -48,9 +48,44 @@ class SystolicArrayTest extends AnyFlatSpec with ChiselScalatestTester {
 
         // 验证出队操作
         dequeue(dut,2.U(rank_width.W))
-        
+        dequeue(dut,3.U(rank_width.W))
+        dequeue(dut,5.U(rank_width.W))
+        dequeue(dut,8.U(rank_width.W))
+        dequeue(dut,-1.S(rank_width.W).asUInt)
+
+        // 进行随机测试
+        val random_seed = 2026 // 设置随机种子
+        Random.setSeed(random_seed)
+        val random_array = Array.fill(100)(Random.nextInt(65535))
+        val sorted_array = random_array.sorted
+        var min_value = 65535
+
+        for (epoch <- 0 until 1) { // 测试轮数可以自行修改
+          min_value = 65535;
+          // 验证enqueue
+          for (i <- 0 until 100) {
+              println("randomvalue:" + random_array(i))
+              if(min_value > random_array(i)) {
+                println("minvalue:" + min_value + "> randomvalue:" + random_array(i))
+                min_value = random_array(i)
+              }
+              println("minvalue update:" + min_value)
+              enqueue(dut,0.U(metadata_width.W),random_array(i).U(rank_width.W),min_value.U(rank_width.W))
+              println("enqueue success!")
+          }
+          // 验证dequeue
+          for (i <- 0 until count_of_entries - 1) {
+              dequeue(dut,sorted_array(i + 1).U(rank_width.W))
+              println("dequeue success!")
+          }
+          // 剩下的部分都为空
+          for (i <- 0 until 10) {
+              dequeue(dut,-1.S(rank_width.W).asUInt)
+              println("empty queue!")
+          }
 
 
+        }
       }
     }
 }
