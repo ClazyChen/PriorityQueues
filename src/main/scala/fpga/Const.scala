@@ -12,10 +12,4 @@ object Const {
 
     // the width of the rank
     val rank_width = 16
-
-    // the type of operation
-    val op_nop = 0
-    val op_enqueue = 1
-    val op_dequeue = 2
-    val op_replace = 3
 }
