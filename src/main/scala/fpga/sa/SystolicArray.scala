@@ -4,7 +4,7 @@ import chisel3._
 import fpga.Const._
 import fpga._
 
-// 感觉开头处理很多会成为瓶颈
+
 class SystolicArray extends Module with PriorityQueueTrait {
     val io = IO(new PQIO)
 
@@ -15,6 +15,7 @@ class SystolicArray extends Module with PriorityQueueTrait {
     last_op := io.op_in
 
     val op = Wire(new Operator)
+
     // 支持push-push，pop/replace-push，不支持push-pop/replace、pop/replace-pop/replace
     // 若当前操作为pop/replace，那上一个操作只能为nop，否则置当前操作为nop
     when (io.op_in.pop && (last_op.pop || last_op.push.existing)) {

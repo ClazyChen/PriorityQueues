@@ -21,6 +21,9 @@ class Block extends Module {
     init.pop := false.B
     val op = RegInit(init) // op里的push就相当于tmp entry
 
+    // 相当于K为1，分支数为1的寄存器版clubheap，
+    //
+    // 新元素需和本元素以及下层传上来的元素比较
     val cmp1 = Wire(Bool())
     val cmp2 = Wire(Bool())
 

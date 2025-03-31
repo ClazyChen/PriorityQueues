@@ -7,6 +7,8 @@ import fpga._
 import fpga.Const._
 import fpga.sa._
 
+
+// 认为测试有待讨论，所以先不修改BlackBox的代码，还是用之前的简单版测试
 class SATest extends  AnyFlatSpec with ChiselScalatestTester {
     def push(dut: SystolicArray, rank: Int, expectRank: Int): Unit = {
         dut.io.op_in.push.existing.poke(true.B)
