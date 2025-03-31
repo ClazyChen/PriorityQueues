@@ -36,8 +36,8 @@ object BlackBox {
     def debugPrint[PQ <: PriorityQueueTrait](tag: String)(implicit pq: PQ): Unit = {
         val entries = pq.io.dbg_port.get.map(_.rank.peek().litValue)
         println(f"${tag}%-8s: ${entries.mkString("[", ", ", "]")}")
-        // val temps = pq.io.dbg_port1.get.map(_.rank.peek().litValue)
-        // println(f"${"temp"}%-8s: ${temps.mkString("[", ", ", "]")}")
+        val temps = pq.io.dbg_port1.get.map(_.rank.peek().litValue)
+        println(f"${"temp"}%-8s: ${temps.mkString("[", ", ", "]")}")
     }
 
     def idle[PQ <: PriorityQueueTrait](implicit pq: PQ, std_pq: PriorityQueue[(Int, Int)]): Unit = {
