@@ -1,4 +1,4 @@
-package fpga.sr
+package fpga.sa
 
 import chisel3._
 import chisel3.util._
@@ -12,7 +12,7 @@ class SystolicBlock extends Module {
         val op_out = Output(new Operator)
         val next_entry_in = Input(new Entry)
         val entry_out = Output(new Entry)
-        val temp_out = Output(new Entry)
+        // val temp_out = Output(new Entry)
     })
 
     val entry = RegInit(Entry.default)
@@ -22,7 +22,7 @@ class SystolicBlock extends Module {
 
     io.entry_out := entry
     io.op_out.push := temp
-    io.temp_out := temp
+    // io.temp_out := temp
 
     val cmp = io.op_in.push < entry
 

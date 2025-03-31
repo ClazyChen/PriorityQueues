@@ -11,7 +11,11 @@
 .idea
 .DS_Store
 .metals
+.gitignore
+.sbtopts
 
 # verilog
 *.v
 *.sv
+
+build.sbt
