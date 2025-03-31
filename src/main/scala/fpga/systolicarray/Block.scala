@@ -41,7 +41,7 @@ class Block extends Module {
     // decision logic
     when (io.op_in.push.existing) { // 对应push操作，这部分实现replace功能
         when (!io.op_in.pop) { // push 
-            val next_entry_state = Mux(cmp_status,compute_forward_state(entry_holder),compute_forward_state(io.op_in.push)) // 超前计算传递出去的状态
+            val next_entry_state = Mux(cmp_status,compute_forward_state(entry_holder),compute_forward_state(io.op_in.push)) // 计算传递出去的状态
             tmp_holder := Mux(cmp_status,entry_holder,io.op_in.push)
             entry_holder := Mux(cmp_status,io.op_in.push,entry_holder)
             io.op_out.push := next_entry_state
@@ -49,7 +49,7 @@ class Block extends Module {
         }
         .otherwise { // replace -> push.existing && pop
             when (!cmp_status) {
-                val next_entry_state = compute_forward_state(io.op_in.push) // 超前计算传递出去的状态
+                val next_entry_state = compute_forward_state(io.op_in.push) // 计算传递出去的状态
                 entry_holder := Mux(cmp_next_rank_status,io.op_in.push,io.next_entry_in)
                 tmp_holder := io.op_in.push
                 io.op_out.push := next_entry_state
@@ -64,5 +64,5 @@ class Block extends Module {
         entry_holder := io.next_entry_in
     }
     .otherwise {} 
-     
+
 }                                                                            
