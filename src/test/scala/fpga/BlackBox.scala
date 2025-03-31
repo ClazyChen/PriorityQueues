@@ -66,7 +66,6 @@ object BlackBox {
         pq.io.op_in.push.metadata.poke(0.U)
         pq.io.op_in.pop.poke(true.B)
         pq.clock.step()
-        // if(debug) debugPrint("pop1")
         idle
         if(debug) debugPrint("pop")
         std_pq.dequeue()
@@ -92,7 +91,7 @@ object BlackBox {
         } else {
             pq.io.entry_out.existing.expect(true.B)
             pq.io.entry_out.rank.expect(std_pq.head._1.U)
-            // pq.io.entry_out.metadata.expect(std_pq.head._2.U)
+            pq.io.entry_out.metadata.expect(std_pq.head._2.U)
         }
     }
 
