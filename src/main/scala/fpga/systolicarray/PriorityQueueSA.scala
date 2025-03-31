@@ -25,7 +25,5 @@ class PriorityQueueSA extends Module with PriorityQueueTrait {
     // 连接到上级模块
     io.entry_out := blocks(0).io.entry_out
     blocks(0).io.op_in := io.op_in
-
     
-
 }

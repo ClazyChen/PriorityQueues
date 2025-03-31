@@ -5,12 +5,6 @@ import chisel3.util._
 import fpga._
 import fpga.Const._
 
-// identical blocks 
-// two registers (entry and temp) 
-// mutiplexer
-// comparator
-// decision logic
-
 // 定义脉动阵列Block结构
 class Block extends Module {
     val io = IO(new Bundle {
@@ -46,20 +40,12 @@ class Block extends Module {
 
     // decision logic
     when (io.op_in.push.existing) { // 对应push操作，这部分实现replace功能
-        when (!io.op_in.pop) { // push
-            when(cmp_status) { // cmp_status 为 true时
-                val next_entry_state = compute_forward_state(entry_holder) // 超前计算传递出去的状态
-                tmp_holder := entry_holder
-                entry_holder := io.op_in.push
-                io.op_out.push := next_entry_state
-                io.op_out.pop := false.B
-            }
-            .otherwise { // cmp_status 为 false时
-                val next_entry_state = compute_forward_state(io.op_in.push) // 超前计算传递出去的状态
-                tmp_holder := io.op_in.push
-                io.op_out.push := next_entry_state
-                io.op_out.pop := false.B
-            }
+        when (!io.op_in.pop) { // push 
+            val next_entry_state = Mux(cmp_status,compute_forward_state(entry_holder),compute_forward_state(io.op_in.push)) // 超前计算传递出去的状态
+            tmp_holder := Mux(cmp_status,entry_holder,io.op_in.push)
+            entry_holder := Mux(cmp_status,io.op_in.push,entry_holder)
+            io.op_out.push := next_entry_state
+            io.op_out.pop := false.B   
         }
         .otherwise { // replace -> push.existing && pop
             when (!cmp_status) {
@@ -77,8 +63,6 @@ class Block extends Module {
         io.op_out.pop := true.B
         entry_holder := io.next_entry_in
     }
-    .otherwise {
-        // do nothing
-    }
-    
+    .otherwise {} 
+     
 }                                                                            
