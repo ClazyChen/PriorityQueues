@@ -35,7 +35,7 @@ class Block extends Module {
 
     when(io.op_in.pop) {
         // 如果push小于temp和next,push放置在当前block,不需要从后面的块pop
-        when(io.op_in.push < temp && io.op_in.push < io.next_entry_in) {
+        when(cmp_push_temp && cmp_push_next) {
             entry := Mux(io.cmp_in, entry, io.op_in.push)
             op := Operator.default
             io.cmp_out := cmp_temp_next
