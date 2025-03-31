@@ -31,21 +31,24 @@ class Block extends Module {
         Mux(minAB < c, minAB, c)
     }
 
+    // TODO 比较器太多了,应该可以简化
     when(io.op_in.pop) {
-        when(io.op_in.push.existing) {
-            entry := Mux(cmp, entry, min(io.op_in.push, temp, io.next_entry_in))
+        // 如果push小于temp和next,push放置在当前block,不需要从后面的块pop
+        when(io.op_in.push < temp && io.op_in.push < io.next_entry_in) {
+            entry := Mux(cmp, entry, io.op_in.push)
+            op := Operator.default
+        // 否则,从后面的块获取entry,push需要向后传递
         } .otherwise {
-            entry := Mux(temp < io.next_entry_in, temp, io.next_entry_in)
+            entry := min(io.op_in.push, temp, io.next_entry_in)
+            op.push := io.op_in.push
+            op.pop := true.B
         }
-        op.push := Mux(io.op_in.push.existing && !cmp, io.op_in.push, Entry.default)
-        op.pop := Mux(cmp, false.B, true.B)
     } .otherwise {
         op.push := Mux(cmp, entry, io.op_in.push)
         entry := Mux(cmp, io.op_in.push, entry)
         op.pop := false.B
     }
     
-    // op.pop := io.op_in.pop && io.op_in.push.existing && !cmp || io.op_in.pop && !io.op_in.push.existing
     temp := op.push
     io.op_out := op
 
