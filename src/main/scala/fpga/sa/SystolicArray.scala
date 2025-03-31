@@ -1,4 +1,4 @@
-package fpga.sr
+package fpga.sa
 
 import chisel3._
 import chisel3.util._
@@ -9,7 +9,7 @@ class SystolicArray extends Module with PriorityQueueTrait {
     val io = IO(new PQIO)
 
     val blocks = Seq.fill(count_of_entries)({
-        val block = Module(new SystolicBlock)
+        val block = Module(new Block)
         block
     })
 
@@ -26,9 +26,9 @@ class SystolicArray extends Module with PriorityQueueTrait {
         io.dbg_port.foreach { dbg_port =>
             dbg_port := blocks.map(_.io.entry_out)
         }
-        io.dbg_port1.foreach { dbg_port =>
-            dbg_port := blocks.map(_.io.temp_out)
-        }
+        // io.dbg_port1.foreach { dbg_port =>
+        //     dbg_port := blocks.map(_.io.temp_out)
+        // }
 
     }
 

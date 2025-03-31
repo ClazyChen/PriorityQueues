@@ -13,6 +13,6 @@ object Const {
     // the width of the rank
     val rank_width = 6
 
-    val debug = true
+    val debug = false
 
 }
