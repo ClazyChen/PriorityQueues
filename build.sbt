@@ -1,31 +1,24 @@
-//ThisBuild / version := "0.1.0"
-//ThisBuild / scalaVersion := "2.13.15"
-//ThisBuild / organization     := "%ORGANIZATION%"
-//
-//val chiselVersion = "6.6.0"
-//
-//lazy val root = (project in file("."))
-//  .settings(
-//    name := "SystolicArray",
-//    libraryDependencies ++= Seq(
-//      "org.chipsalliance" %% "chisel" % chiselVersion,
-//      "org.scalatest" %% "scalatest" % "3.2.16" % "test",
-//    ),
-//    scalacOptions ++= Seq(
-//      "-language:reflectiveCalls",
-//      "-deprecation",
-//      "-feature",
-//      "-Xcheckinit",
-//      "-Ymacro-annotations",
-//    ),
-//    addCompilerPlugin("org.chipsalliance" % "chisel-plugin" % chiselVersion cross CrossVersion.full),
-//  )
+ThisBuild / scalaVersion     := "2.13.12"
+ThisBuild / version          := "0.1.0"
+ThisBuild / organization     := "com.github.clazychen"
 
-name := "ChiselProject"
-version := "0.1"
-scalaVersion := "2.13.14"
+val chiselVersion = "6.6.0"
 
-val chiselVersion = "3.6.1"
-addCompilerPlugin("edu.berkeley.cs" %% "chisel3-plugin" % chiselVersion cross CrossVersion.full)
-libraryDependencies += "edu.berkeley.cs" %% "chisel3" % chiselVersion
-libraryDependencies += "edu.berkeley.cs" %% "chiseltest" % "0.6.2"
+lazy val root = (project in file("."))
+  .settings(
+    name := "PriorityQueue",
+    libraryDependencies ++= Seq(
+      "org.chipsalliance" %% "chisel" % chiselVersion,
+      "edu.berkeley.cs" %% "chiseltest" % "6.0.0" % "test"
+    ),
+    scalacOptions ++= Seq(
+      "-language:reflectiveCalls",
+      "-deprecation",
+      "-feature",
+      "-Xcheckinit",
+      "-Ymacro-annotations",
+      "-language:postfixOps",
+    ),
+    addCompilerPlugin("org.chipsalliance" % "chisel-plugin" % chiselVersion cross CrossVersion.full),
+    Test / classLoaderLayeringStrategy := ClassLoaderLayeringStrategy.Flat
+  )

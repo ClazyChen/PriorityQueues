@@ -1,4 +1,4 @@
-package SystolicArray
+package systolicarray
 
 import chisel3._
 import chiseltest.RawTester.test

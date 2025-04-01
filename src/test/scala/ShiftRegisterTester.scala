@@ -1,4 +1,4 @@
-package ShiftRegister
+package shiftregister
 
 import chisel3._
 import chiseltest.RawTester.test
