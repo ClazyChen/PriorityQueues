@@ -14,6 +14,12 @@ class Entry extends Bundle {
     
     // compare two entries by rank
     def <(that: Entry): Bool = (this.rank < that.rank) || !that.existing
+
+    // return min and max of two entries
+    def minmax(that: Entry): (Entry, Entry) = {
+        val replace = this < that
+        (Mux(replace, this, that), Mux(replace, that, this))
+    }
 }
 
 // the default entry (invalid entry)
@@ -33,6 +39,15 @@ class Operator extends Bundle {
 	val pop = Bool() // pop an entry from the priority queue
 } 
 
+// the no-operation operator
+object Operator {
+    def nop: Operator = {
+        val op = Wire(new Operator)
+        op.push := Entry.default
+        op.pop := false.B
+        op
+    }
+}
 // the io of the priority queue
 trait PriorityQueueTrait extends Module {
     class PQIO extends Bundle {
