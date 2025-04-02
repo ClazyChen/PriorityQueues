@@ -316,9 +316,10 @@ def help():
         [-c/--clean]              清除之前的构建结果
         [-r/--remove-comment]     移除 Verilog 代码中的注释
         [-o/--output output_path] 指定输出路径
-    test [module_name]           测试指定模块
+    test [module_name]           测试指定模块（BlackBox）
         [-w/--wave]               生成波形文件
         [-c/--clean]              清除之前的测试结果
+        [--op]                    指定用于测试的操作序列
     ! [command]                  执行 shell 命令
     # [comment]                  打印注释
     help                         显示帮助信息
@@ -349,12 +350,16 @@ def execute(command):
         except Exception as e:
             print_error(f"Error executing command {command_name}: {e}")
     elif command_name.startswith("!"): # 执行 shell 命令
+        if len(command_name) == 1:
+            command = command[1:]
+        else:
+            command[0] = command[0][1:]
         try:
-            os.system(' '.join(command)[1:])
+            os.system(' '.join(command))
         except Exception as e:
             print_error(f"Error executing command {command_name}: {e}")
     elif command_name.startswith("#"): # 打印注释
-        print_auto(command_name[1:])
+        print_auto(' '.join(command))
     else:
         print_error(f"Unknown command {command_name}")
 
