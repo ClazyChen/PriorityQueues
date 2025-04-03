@@ -36,7 +36,7 @@ class {module_name}Test extends AnyFlatSpec with ChiselScalatestTester {{
     behavior of "{module_name}"
     it should "work" in {{
         test(new {module_name}) {{ c =>
-            test_black_box(c)
+            test_black_box(c, {op_gen_func}())
         }}
     }}
 }}
@@ -234,12 +234,18 @@ def build(*args):
 # test module_name [-w/--wave] [-c/--clean]
 # -w/--wave 参数表示生成波形文件
 # -c/--clean 参数表示清除之前的测试结果
+# --op 参数表示生成随机操作序列的方法
 def test(*args):
     parser = argparse.ArgumentParser()
     parser.add_argument("module_name", type=str)
     parser.add_argument("-w", "--wave", action="store_true")
     parser.add_argument("-c", "--clean", action="store_true")
+    parser.add_argument("--op", type=str)
     args = parser.parse_args(args)
+    # 如果 args.op 参数为空，则采用默认的 random_ops 方法
+    op_gen_func = "random_ops"
+    if args.op is not None:
+        op_gen_func = args.op
     package_name, module_name, module_args = parse_module_name(args.module_name)
     test_run_dir = os.path.join(current_dir, "test_run_dir")
     if not os.path.exists(test_run_dir):
@@ -262,7 +268,7 @@ def test(*args):
         os.makedirs(test_dir)
     # 生成对应的测试文件
     with open(os.path.join(test_dir, f"{module_name}Test.scala"), "w") as f:
-        f.write(template_test_scala.format(package_name=package_name, module_name=module_name))
+        f.write(template_test_scala.format(package_name=package_name, module_name=module_name, op_gen_func=op_gen_func))
     # 如果 args.wave 参数为真，则添加 -DwriteVcd=1 参数
     sbt_options = []
     if args.wave:
@@ -310,9 +316,10 @@ def help():
         [-c/--clean]              清除之前的构建结果
         [-r/--remove-comment]     移除 Verilog 代码中的注释
         [-o/--output output_path] 指定输出路径
-    test [module_name]           测试指定模块
+    test [module_name]           测试指定模块（BlackBox）
         [-w/--wave]               生成波形文件
         [-c/--clean]              清除之前的测试结果
+        [--op]                    指定用于测试的操作序列
     ! [command]                  执行 shell 命令
     # [comment]                  打印注释
     help                         显示帮助信息
@@ -343,12 +350,16 @@ def execute(command):
         except Exception as e:
             print_error(f"Error executing command {command_name}: {e}")
     elif command_name.startswith("!"): # 执行 shell 命令
+        if len(command_name) == 1:
+            command = command[1:]
+        else:
+            command[0] = command[0][1:]
         try:
-            os.system(' '.join(command)[1:])
+            os.system(' '.join(command))
         except Exception as e:
             print_error(f"Error executing command {command_name}: {e}")
     elif command_name.startswith("#"): # 打印注释
-        print_auto(command_name[1:])
+        print_auto(' '.join(command))
     else:
         print_error(f"Unknown command {command_name}")
 
@@ -365,4 +376,3 @@ if __name__ == "__main__":
         run(sys.argv[1])
     else:
         main()
-

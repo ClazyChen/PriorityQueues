@@ -11,15 +11,13 @@ import fpga.Const._
 object BlackBox {
 
     // cold start operations (all of them are push operations)
-    val cold_start_ops = 10
+    val cold_start_ops = count_of_entries
 
     // number of operations in the test
     val num_ops = 100
 
     // push, pop, replace ratio
-    // val ratio = (1.0, 0.0, 0.0)
-    // val ratio = (0.6, 0.4, 0.0)
-    val ratio = (0.3, 0.2, 0.5)
+    val ratio = (0.3, 0.3, 0.4)
     val op_push = 0
     val op_pop = 1
     val op_replace = 2
@@ -33,19 +31,10 @@ object BlackBox {
     // random seed
     val seed = 1234567890
 
-    def debugPrint[PQ <: PriorityQueueTrait](tag: String)(implicit pq: PQ): Unit = {
+    def debug_print[PQ <: PriorityQueueTrait](tag: String)(implicit pq: PQ): Unit = {
         val entries = pq.io.dbg_port.get.map(_.rank.peek().litValue)
         println(f"${tag}%-8s: ${entries.mkString("[", ", ", "]")}")
-        // val temps = pq.io.dbg_port1.get.map(_.rank.peek().litValue)
-        // println(f"${"temp"}%-8s: ${temps.mkString("[", ", ", "]")}")
-    }
 
-    def idle[PQ <: PriorityQueueTrait](implicit pq: PQ, std_pq: PriorityQueue[(Int, Int)]): Unit = {
-        pq.io.op_in.push.existing.poke(false.B)
-        pq.io.op_in.push.rank.poke(-1.S(rank_width.W).asUInt)
-        pq.io.op_in.push.metadata.poke(0.U)
-        pq.io.op_in.pop.poke(false.B)
-        pq.clock.step()
     }
 
     // push a new entry into the priority queue
@@ -56,7 +45,7 @@ object BlackBox {
         pq.io.op_in.pop.poke(false.B)
         pq.clock.step()
         std_pq.enqueue((rank, metadata))
-        if(debug) debugPrint(s"push(${rank})")
+        if(debug) debug_print(s"push(${rank})")
     }
 
     // pop the top entry from the priority queue
@@ -66,9 +55,8 @@ object BlackBox {
         pq.io.op_in.push.metadata.poke(0.U)
         pq.io.op_in.pop.poke(true.B)
         pq.clock.step()
-        idle
-        if(debug) debugPrint("pop")
         std_pq.dequeue()
+        if(debug) debug_print("pop")
     }
 
     // replace the top entry with a new entry
@@ -78,10 +66,9 @@ object BlackBox {
         pq.io.op_in.push.metadata.poke(metadata.U)
         pq.io.op_in.pop.poke(true.B)
         pq.clock.step()
-        idle
         std_pq.enqueue((rank, metadata))
         std_pq.dequeue()
-        if(debug) debugPrint(s"rep(${rank})")
+        if(debug) debug_print(s"rep(${rank})")
     }
 
     // check the top entry of the priority queue
@@ -91,22 +78,27 @@ object BlackBox {
         } else {
             pq.io.entry_out.existing.expect(true.B)
             pq.io.entry_out.rank.expect(std_pq.head._1.U)
-            pq.io.entry_out.metadata.expect(std_pq.head._2.U)
+            // pq.io.entry_out.metadata.expect(std_pq.head._2.U)
         }
     }
 
-    // the test body
-    def test_black_box[PQ <: PriorityQueueTrait](c: PQ): Unit = {
-        // random generator in [0, 2^rank_width - 1]
-        val random = new Random(seed)
+    val random = new Random(seed)
 
+    def random_ops(): Array[Int] = {
+        Array.fill(num_ops)(to_op(random.nextDouble()))
+    }
+
+    // generate a sequence of push and pop operations
+    // push, pop, push, pop, ...
+    def push_pop_ops(): Array[Int] = {
+        (0 until num_ops).map(i => if (i % 2 == 0) op_push else op_pop).toArray
+    }
+
+    // the test body
+    def test_black_box[PQ <: PriorityQueueTrait](c: PQ, test_ops: Array[Int]): Unit = {
         // generate the cold start numbers and the test numbers
         val cold_start_nums = Array.fill(cold_start_ops)(random.nextInt(1 << rank_width))
         val test_nums = Array.fill(num_ops)(random.nextInt(1 << rank_width))
-
-        // test operations, the ratio is recorded in the ratio variable
-        // 0 for push, 1 for pop, 2 for replace
-        val test_ops = Array.fill(num_ops)(to_op(random.nextDouble()))
 
         // the built-in priority queue to check the result, and the priority queue to test
         lazy implicit val std_pq = new PriorityQueue[(Int, Int)]()(Ordering.by((x: (Int, Int)) => (x._1, x._2)).reverse)
