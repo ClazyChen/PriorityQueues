@@ -31,7 +31,16 @@ object Entry {
 class Operator extends Bundle {
 	val push = new Entry // push an entry into the priority queue
 	val pop = Bool() // pop an entry from the priority queue
-} 
+}
+
+// the default entry (invalid entry)
+object Operator {
+    def nop: Operator = {
+        val operator = Wire(new Operator)
+        operator.push = Entry.default
+        operator.pop = false.B
+    }
+}
 
 // the io of the priority queue
 trait PriorityQueueTrait extends Module {

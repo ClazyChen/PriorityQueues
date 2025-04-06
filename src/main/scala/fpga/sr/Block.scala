@@ -21,6 +21,9 @@ class Block extends Module{
     io.cmp_out := cmp
     io.entry_out := entry
 
+    // 9 7 5 3 1
+    // replace 6
+    // 9 7 6 5 3
     //    when(io.op_in.pop && !io.op_in.push.existing) {
     //        entry := io.next_entry_in
     //    }.elsewhen(!io.op_in.pop && io.op_in.push.existing) {
