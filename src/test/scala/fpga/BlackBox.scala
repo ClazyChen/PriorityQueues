@@ -73,18 +73,23 @@ object BlackBox {
         }
     }
 
-    // the test body
-    def test_black_box[PQ <: PriorityQueueTrait](c: PQ): Unit = {
-        // random generator in [0, 2^rank_width - 1]
-        val random = new Random(seed)
+    val random = new Random(seed)
 
+    def random_ops(): Array[Int] = {
+        Array.fill(num_ops)(to_op(random.nextDouble()))
+    }
+
+    // generate a sequence of push and pop operations
+    // push, pop, push, pop, ...
+    def push_pop_ops(): Array[Int] = {
+        (0 until num_ops).map(i => if (i % 2 == 0) op_push else op_pop).toArray
+    }
+
+    // the test body
+    def test_black_box[PQ <: PriorityQueueTrait](c: PQ, test_ops: Array[Int]): Unit = {
         // generate the cold start numbers and the test numbers
         val cold_start_nums = Array.fill(cold_start_ops)(random.nextInt(1 << rank_width))
         val test_nums = Array.fill(num_ops)(random.nextInt(1 << rank_width))
-
-        // test operations, the ratio is recorded in the ratio variable
-        // 0 for push, 1 for pop, 2 for replace
-        val test_ops = Array.fill(num_ops)(to_op(random.nextDouble()))
 
         // the built-in priority queue to check the result, and the priority queue to test
         lazy implicit val std_pq = new PriorityQueue[(Int, Int)]()(Ordering.by((x: (Int, Int)) => (x._1, x._2)).reverse)

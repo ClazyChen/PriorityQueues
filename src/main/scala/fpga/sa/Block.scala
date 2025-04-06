@@ -1,55 +1,46 @@
 package fpga.sa
 
 import chisel3._
-import fpga.Const._
+import chisel3.util._
 import fpga._
+import fpga.Const._
 
+// a block in the systolic array
 class Block extends Module {
     val io = IO(new Bundle {
-        val op_in = Input(new Operator)
-        val cmp_in = Input(Bool())
-        val next_entry_in = Input(new Entry)
-        val op_out = Output(new Operator)
-        val entry_out = Output(new Entry)
+        val op_in = Input(new Operator) // from the previous block
+        val op_out = Output(new Operator) // to the next block
+        val entry_in = Input(new Entry) // from the next block
+        val entry_out = Output(new Entry) // to the previous block
     })
 
+    // the entry stored in the block
     val entry = RegInit(Entry.default)
-    val op = RegInit(Operator.nop)
-    val cmp = io.op_in.push < entry
 
-    val entry_hold := Mux(cmp, io.op.push, entry)
-    val entry_next := Mux(cmp, entry, op.push)
+    // the operation to be performed in the next block
+    val op_out = RegInit(Operator.nop)
+    io.op_out := op_out
 
-    entry := entry_hold
-    op.push := entry_next
-    op.pop := io.op_in.pop
+    // make comparison
+    val (entry_updated, entry_next) = io.op_in.push.minmax(entry)
 
-    io.op_out := op
-    io.entry_out := entry_hold
+    // update the entry
+    when (io.op_in.pop) {
+        entry := io.entry_in
+    } .otherwise {
+        entry := entry_updated
+    }
+    
+    // pass push/pop signals to the next block
+    op_out.pop := io.op_in.pop
+    op_out.push := entry_next
 
-    when(io.op_in.pop) {
-        // 除了第一个block，其他block的new entry一定>= entry
-        // 所以不用比较new entry和entry，然后对第一个block特殊处理一下就好
-        when(cmp) {
-            // replace case 1，那么后面就不用进行replace操作了
-            entry := io.op_in.push
-            op := Operator.default
-        }.otherwise {
-            // pop or replace case 2
-            // 保持原参数继续向后传递
-            entry := io.next_entry_in
-            op := io.op_in
-        }
-    }.otherwise {
-        // 这里是本entry和new entry的比较结果
-        when(cmp_in) {
-            // push case 1
-            entry := io.op_in.push
-            op.push := entry
-        }.otherwise {
-            // push case 2 or nop
-            op.push := io.op_in.push
-        }
-        op.pop := io.op_in.pop
+    // pass the updated entry to the previous block
+    io.entry_out := entry_updated
+
+    // connect blocks, this ~> next
+    def ~>(next: Block) = {
+        next.io.op_in := this.io.op_out
+        this.io.entry_in := next.io.entry_out
     }
 }
