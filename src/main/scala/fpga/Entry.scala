@@ -32,6 +32,16 @@ class Operator extends Bundle {
 	val pop = Bool()        // pop an entry from the priority queue
 } 
 
+// operator initialization
+object Operator {
+    def nop: Operator = {
+        val op = Wire(new Operator)
+        op.push := Entry.default
+        op.pop := false.B
+        op
+    }
+}
+
 // the io of the priority queue
 trait PriorityQueueTrait extends Module {
     class PQIO extends Bundle {
