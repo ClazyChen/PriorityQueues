@@ -5,7 +5,7 @@ import chisel3.util._
 import fpga._
 import fpga.Const._
 
-// 定义脉动阵列Block结构
+// systolic array block
 class Block extends Module {
     val io = IO(new Bundle {
        val op_in = Input(new Operator)          
@@ -15,31 +15,32 @@ class Block extends Module {
     })
 
     val entry = RegInit(Entry.default)
-    val op = RegInit(Operator.nop)
+    val op = RegInit(Operator.nop) // pipelined register
 
-    io.entry_out := entry_out
+    io.entry_out := entry
     io.op_out := op
 
     // use this function to generate what should be passed and what should be updated
-    def cal_forward_and_update(Entry : current_entry, Entry : input_entry) -> (Entry, Entry) {
-        val update_here = current_entry.rank < input_entry.rank
-        return Mux(update_here,(input_entry, current_entry),(current_entry, input_entry))
+    def cal_forward_and_update(current_entry : Entry, push_entry : Entry) : (Entry, Entry) =  {
+        val dont_update_here = current_entry < push_entry
+        (Mux(dont_update_here,push_entry,current_entry),Mux(dont_update_here,current_entry,push_entry)) // cost depends on bit width
     }
 
-    // decision logic
-    when (io.op_in.pop) {
-        entry := entry_in
-        op.push := Entry.default
-        op.pop := true.B
+    val (forward_entry, update_entry) = cal_forward_and_update(entry, io.op_in.push)
+
+    // decision logic supports for push and pop only
+    when(io.op_in.pop) {
+        entry := io.entry_in
     }.otherwise {
-        val (forward_entry, update_entry) = cal_forward_and_update(entry, io.op_in.push)
         entry := update_entry
-        op.push := forward_entry
-        op.pop := false.B
     }
 
+    op.pop := io.op_in.pop
+    op.push := forward_entry
 
-    def -> (next:Block) => {
+    io.entry_out := update_entry // use entry may cause time-sequence problems
+
+    def ~> (next : Block) = {
         next.io.op_in <> this.io.op_out
         this.io.entry_in <> next.io.entry_out
     }

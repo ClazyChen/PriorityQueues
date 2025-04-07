@@ -6,7 +6,7 @@ import fpga._
 import fpga.Const._
 
 // top-module : PriorityQueue Block
-class PriorityQueueSR extends Module with PriorityQueueTrait {
+class ShiftRegister extends Module with PriorityQueueTrait {
     
     // 实现trait中定义的IO接口 
     val io = IO(new PQIO)
