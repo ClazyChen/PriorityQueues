@@ -13,6 +13,7 @@ class Entry extends Bundle {
     val rank = UInt(rank_width.W) // rank (priority)
     
     // compare two entries by rank
+    // TODO 需要k考虑rank相同时，metadata的比较
     def <(that: Entry): Bool = (this.rank < that.rank) || !that.existing
 }
 
