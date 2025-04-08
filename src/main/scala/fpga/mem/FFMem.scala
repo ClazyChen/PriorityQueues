@@ -8,7 +8,7 @@ class FFMem(
     val data_depth: Int,
     val data_width: Int,
 ) extends Module with DualPortMemoryImpl {
-    val addr_width = log2Ceil(data_depth)
+    val addr_width = log2Ceil(data_depth) // when data_depth === 1 ? 
 
     val io = IO(new Bundle{
         val r = new ReadPort(addr_width, data_width)

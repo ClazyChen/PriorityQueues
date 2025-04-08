@@ -12,4 +12,8 @@ object Const {
 
     // the width of the rank
     val rank_width = 16;
+
+    // number of levels in the P-heap
+    val count_of_levels = 256;
+
 }
