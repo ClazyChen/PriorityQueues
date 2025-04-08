@@ -8,21 +8,18 @@ import fpga.Const._
 class SystolicArray extends Module with PriorityQueueTrait {
     val io = IO(new PQIO)
 
+    // the blocks in the systolic array
     val blocks = Seq.fill(count_of_entries)(Module(new Block))
 
+    // the dummy signal previous to the first block
     io.entry_out := blocks.head.io.entry_out
-
     blocks.head.io.op_in := io.op_in
-    blocks.head.io.cmp_in := io.op_in.push < blocks.head.io.entry_out
-    
-    for(i <- 0 until count_of_entries - 1) {
-        blocks(i) -> blocks(i + 1)
-    }
-    blocks.last.io.next_entry_in := Entry.default
 
-    if(debug) {
-        io.dbg_port.foreach { dbg_port =>
-            dbg_port := blocks.map(_.io.entry_out)
-        }
+    // connect blocks one by one
+    for (i <- 0 until count_of_entries - 1) {
+        blocks(i) ~> blocks(i + 1)
     }
+
+    // the dummy signal next to the last block
+    blocks.last.io.entry_in := Entry.default
 }

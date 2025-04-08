@@ -5,44 +5,42 @@ import chisel3.util._
 import fpga._
 import fpga.Const._
 
-
+// a block in the systolic array
 class Block extends Module {
     val io = IO(new Bundle {
-        val op_in = Input(new Operator)
-        val op_out = Output(new Operator)
-        val next_entry_in = Input(new Entry)
-        val entry_out = Output(new Entry)
-        val cmp_in = Input(Bool()) // io.op_in.push < entry
-        val cmp_out = Output(Bool())
+        val op_in = Input(new Operator) // from the previous block
+        val op_out = Output(new Operator) // to the next block
+        val entry_in = Input(new Entry) // from the next block
+        val entry_out = Output(new Entry) // to the previous block
     })
 
+    // the entry stored in the block
     val entry = RegInit(Entry.default)
-    val op = RegInit(Operator.default)
 
-    io.entry_out := entry
-    io.op_out := op
-    io.cmp_out := DontCare
+    // the operation to be performed in the next block
+    val op_out = RegInit(Operator.nop)
+    io.op_out := op_out
 
-    val cmp = op.push < io.next_entry_in
+    // make comparison
+    val (entry_updated, entry_next) = io.op_in.push.minmax(entry)
 
-    when(io.op_in.pop) {
-        entry := Mux(cmp, op.push, io.next_entry_in)
-        op := io.op_in
-        io.cmp_out := cmp
+    // update the entry
+    when (io.op_in.pop) {
+        entry := io.entry_in
     } .otherwise {
-        when(io.cmp_in) {
-            op.push := entry
-            entry := io.op_in.push
-        } .otherwise {
-            op.push := io.op_in.push
-        }
-        op.pop := false.B
+        entry := entry_updated
     }
+    
+    // pass push/pop signals to the next block
+    op_out.pop := io.op_in.pop
+    op_out.push := entry_next
 
+    // pass the updated entry to the previous block
+    io.entry_out := entry_updated
 
-    def ->(next: Block) = {
+    // connect blocks, this ~> next
+    def ~>(next: Block) = {
         next.io.op_in := this.io.op_out
-        this.io.next_entry_in := next.io.entry_out
-        next.io.cmp_in := this.io.cmp_out
+        this.io.entry_in := next.io.entry_out
     }
 }
