@@ -25,7 +25,7 @@ class Block extends Module {
         val dont_update_here = current_entry < push_entry
         (Mux(dont_update_here,push_entry,current_entry),Mux(dont_update_here,current_entry,push_entry)) // cost depends on bit width
     }
-
+ 
     val (forward_entry, update_entry) = cal_forward_and_update(entry, io.op_in.push)
 
     // decision logic supports for push and pop only
