@@ -5,7 +5,7 @@ import chisel3.util._
 
 // a pseudo-dual-port memory with SRAM
 class Sram(
-    val data_depth: Int,
+    val data_depth: Int, // 存储单元数量
     val data_width: Int,
 ) extends Module with DualPortMemoryImpl {
     val addr_width = log2Ceil(data_depth)
@@ -30,6 +30,7 @@ class Sram(
 
     // read and write conflict handling: when the read and write address are the same, we need to handle it specially
     // because the SRAM read has a one cycle delay, we need to store the write information of the previous cycle to handle the conflict
+    // read本身就有一个cycle的延迟，所以这里用RegNext，如果用Wire就没有延迟了
     val same_addr_delay = RegNext(io.r.en && io.w.en && io.r.addr === io.w.addr)
     val wdata_delay = RegNext(io.w.data)
     
