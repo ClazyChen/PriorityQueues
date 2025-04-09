@@ -34,7 +34,6 @@ class RPU(val level : Int) extends Module {
 
         val state = Input(new State) // read execute write
 
-
         val prev_dual_entry_in = Input()    // 上层操作的子节点传过来变为本层的父节点
         val next_dual_entry_out = Output()  // 本层子节点->下层
 
@@ -43,7 +42,7 @@ class RPU(val level : Int) extends Module {
         // 读下层，一次性读两个子节点，第level+1层有2^level个节点，所以地址线需要level-1根
         val read = Output(Bool())
         val read_addr = Output(UInt( Math.max(1, level - 1).W ))
-        val read_dual_entry = Output(Vec(2, Node()))
+        val read_dual_entry = Input(Vec(2, Node()))
 
         // 写本层，一次性两个节点，所以地址线需要level-2根
         val write = Output(Bool())
@@ -83,7 +82,7 @@ class RPU(val level : Int) extends Module {
             dual_entry := io.prev_dual_entry_in     // reg TODO 这里的赋值应该和state变为read同时进行
             read := true.B                          // wire
             read_addr := next_addr                  // wire
-            next_dual_entry := read_dual_entry      // reg
+            next_dual_entry := read_dual_entry      // reg 兄弟子节点下个上升沿读入寄存器
         }
         is(State.cmp) {
             /*

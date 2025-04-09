@@ -13,11 +13,11 @@ class PHeap extends Module with PriorityQueueTrait {
     // the token array in the pheap
     val token_array = Seq.fill(level)(Module(new Token))
 
-    // the rank processing unit in the pheap
     // 想法：
     //      看起来一层一个RPU，但由于某层执行时相邻层必然nop，
     //      所以只需要(level + 1) / 2个RPU就行了？
     //      即RPUi负责处理第2i - 1, 2i层
+    // the rank processing unit in the pheap
     val RPUs = Seq.fill(level)(Module(new RPU))
 
     // 创建SRAM并连线
