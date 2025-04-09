@@ -26,9 +26,5 @@ class ShiftRegister extends Module with PriorityQueueTrait {
     blockArray.last.io.next_entry_in := Entry.default
     blockArray.last.io.next_cmp_in := true.B
 
-//    when (blockArray.head.io.cmp_out && io.op_in.pop) {
-//        io.entry_out := io.op_in.push
-//    }.otherwise {
-        io.entry_out := blockArray.head.io.entry_out
-   // }
+    io.entry_out := blockArray.head.io.entry_out
 }
