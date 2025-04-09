@@ -12,15 +12,12 @@ class PHeap extends Module with PriorityQueueTrait {
     val io = IO(new PQIO)
 
     val rpus = VecInit(Seq.tabulate(count_of_levels) { level =>
-        Module(new RPU(level))
-    })
-    val rpus = VecInit(Seq.tabulate(count_of_levels) { level =>
         val level_module = Module(new RPU(level))
         level_module.init_memory()
         level_module
     })
 
-    io.entry_out := read(rpus.head.mem_out, 0)
+    io.entry_out := read(0, rpus.head.mem_out, 0)
     
     val token = TokenNode.init(io.entry_in, io.op_in)
     rpus.head.token_in := token
