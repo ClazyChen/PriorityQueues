@@ -1,9 +1,9 @@
 package fpga.pheap
 
 
-object Const {
+object Param {
 
-    val pheap_levels = 4
+    val count_of_levels = 4
 
     val useSram = true
 

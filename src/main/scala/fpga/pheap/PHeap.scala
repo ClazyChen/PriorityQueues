@@ -5,53 +5,27 @@ import chisel3.util._
 import fpga._
 import fpga.Const._
 import fpga.mem._
-import fpga.pheap.Param.Const._
+import fpga.pheap.Param._
 
 
 
 class PHeap extends Module with PriorityQueueTrait {
     val io = IO(new PQIO)
 
-    val mems = (0 to pheap_levels).map { level =>
-        val data_depth = if(level == 0) 1 else 1 << (level - 1)
-        Module(new Memory(data_depth, rank_width, true))
-    }
-    val tokens = RegInit(Seq.fill(pheap_levels + 1)(new TokenNode))
+    val pheap_levels = VecInit(Seq.tabulate(count_of_levels) { level =>
+        Module(new PHeapLevel(level))
+    })
 
-    if(io.op_in.pop) {
+    // TODO 引入哨兵会增加一级延迟,需要修改
+    io.entry_out := read(pheap_levels.head.mem_out, 0)
+    
+    val token = TokenNode.init(io.entry_in, io.op_in)
+    pheap_levels.head.token_in := token
 
-    } .otherwise {
+    // TODO 最后一个level的子level怎么初始化?
+    // pheap_levels.last.mem_in := ?
 
-    }
-
-    for (i <- 0 to levels) {
-        val pos = tokens(i).position
-        val mem = mems(i)
-        val addr = pos(i, 0)
-        mem.io.addr := addr
-        mem.io.en   := true.B
-        mem.io.wen  := false.B  // by default a read
-        val storedPacked = mem.io.data_out
-
-        val nextToken = Wire(new TokenBundle(totalNodes, params.priorityWidth))
-        nextToken.op       := tokens(i).op       // In a real design this may change after comparisons.
-        nextToken.entry    := tokens(i).entry    // Placeholder: no swap is performed.
-        nextToken.position := tokens(i).position << 1
-        tokens(i + 1) := nextToken
-    }
-
-    when (tokens(levels - 1).op === 2.U || tokens(levels - 1).op === 3.U) {
-        io.entry_out := tokens(levels - 1).entry
-    } .otherwise {
-        // If no pop, provide a default (invalid) entry.
-        io.entry_out := Entry.default
-    }
-
-
-    when (io.op_in.push =/= Entry.default || io.op_in.pop) {
-        // Initialize the root token.
-        tokens(0).op       := Mux(io.op_in.pop, Mux(io.op_in.push =/= Entry.default, 3.U, 2.U), 1.U)
-        tokens(0).entry    := io.op_in.push
-        tokens(0).position := 1.U  // root position is 1
+    for (i <- 0 until count_of_levels) {
+        pheap_levels(i) ~> pheap_levels(i + 1)
     }
 }
