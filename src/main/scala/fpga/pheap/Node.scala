@@ -11,7 +11,6 @@ def capacity_width(level: Int) = log2Ceil(get_capacity(level))
 
 def position_width(level: Int) = Mux(level == 0, 1, level)
 
-// TODO 下面的几个函数都需要相应修改
 def get_data_depth(level: Int) = 1 << level
 
 // 这里idx是在整个堆中的索引,pos是当前level中的索引
@@ -58,6 +57,7 @@ class Memory (
         val w = new WritePort(addr_width, data_width)
     })
 
+    // Sram读有延迟,写无延迟
     val mem = if(use_sram) Module(new Sram(data_depth, data_width))
             else Module(new FFMem(data_depth, data_width))
     
@@ -69,7 +69,7 @@ class Memory (
     io.r.data := mem.io.r.data
 }
 
-def read(memory: Memory, addr: UInt): Node = {
+def read(level: Int, memory: Memory, addr: UInt): Node = {
     memory.io.r.en   := true.B
     memory.io.r.addr := addr
     memory.io.w.en   := false.B
@@ -78,7 +78,7 @@ def read(memory: Memory, addr: UInt): Node = {
     memory.io.data_out.asTypeOf(new Node(level))
 }
 
-def write(memory: Memory, addr: UInt, node: Node): Unit = {
+def write(level: Int, memory: Memory, addr: UInt, node: Node): Unit = {
     memory.io.r.en   := false.B
     memory.io.r.addr := DontCare
     memory.io.w.en   := true.B

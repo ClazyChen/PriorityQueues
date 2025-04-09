@@ -20,7 +20,6 @@ class PHeap extends Module with PriorityQueueTrait {
         level_module
     })
 
-    // TODO 引入哨兵会增加一级延迟,需要修改
     io.entry_out := read(rpus.head.mem_out, 0)
     
     val token = TokenNode.init(io.entry_in, io.op_in)
