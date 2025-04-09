@@ -4,29 +4,29 @@ import chisel3._
 import chisel3.util._
 import fpga.mem._
 import fpga.Const._
-import fpga.pheap.Param._
 
-def capacity_width(level: Int): Int = {
-    // 只有1个节点时，level = 1
-    // TODO level应该从0开始
-    log2Ceil((1 << (count_of_levels + 1 - level)) - 1)
-}
+def get_capacity(level: Int) = ((1 << (count_of_levels - level)) - 1)
+
+def capacity_width(level: Int) = log2Ceil(get_capacity(level))
+
+def position_width(level: Int) = Mux(level == 0, 1, level)
 
 // TODO 下面的几个函数都需要相应修改
 def get_data_depth(level: Int) = 1 << level
 
-def idx2pos(level: Int, idx: Int) = Mux(level <= 1, 0, idx(level - 2, 0))
+// 这里idx是在整个堆中的索引,pos是当前level中的索引
+def idx2pos(level: Int, idx: Int) = Mux(level == 0, 0, idx(level - 1, 0))
 
-def get_parent_idx(level: Int, pos: Int) = Mux(level <= 1, pos, (1 << (level - 2)) + pos)
+def pos2idx(level: Int, pos: Int) = Mux(level == 0, 0, (1 << (level - 1)) + pos)
 
 def get_lc_pos(level: Int, pos: Int): Int = {
-    val parent_idx = get_parent_idx(level, pos)
-    val lc_idx = 2 * parent_idx
+    val parent_idx = pos2idx(level, pos)
+    val lc_idx = 2 * parent_idx + 1
     idx2pos(lc_idx)
 }
 def get_rc_pos(level: Int, pos: Int): Int = {
-    val parent_idx = get_parent_idx(level, pos)
-    val rc_idx = 2 * parent_idx + 1
+    val parent_idx = pos2idx(level, pos)
+    val rc_idx = 2 * parent_idx + 2
     idx2pos(rc_idx)
 }
 
@@ -40,7 +40,7 @@ object Node {
     def init(level: Int, inValue: Entry): Node = {
         val node = Wire(new Node(level))
         node.value := inValue
-        node.capacity := ((1 << (count_of_levels + 1 - level)) - 1).U
+        node.capacity := get_capacity(level).U
         node
     }
 }
@@ -87,23 +87,23 @@ def write(memory: Memory, addr: UInt, node: Node): Unit = {
 }
 
 
-class TokenNode extends Bundle {
+class TokenNode(val level: Int) extends Bundle {
     val entry    = new Entry
     val op       = new Operator
-    val position = UInt(level.W) // TODO
+    val position = UInt(position_width(level).W)
 }
 
 object TokenNode {
-    def default: TokenNode = {
-        val token_node = Wire(new TokenNode)
+    def default(level: Int): TokenNode = {
+        val token_node = Wire(new TokenNode(level))
         token_node.entry := Entry.default
         token_node.op := Operator.nop
         token_node.position := 0.U
         token_node
     }
 
-    def init(entry: Entry, op: Operator): TokenNode = {
-        val token_node = Wire(new TokenNode)
+    def init(level: Int, entry: Entry, op: Operator): TokenNode = {
+        val token_node = Wire(new TokenNode(level)) 
         token_node.entry := entry
         token_node.op := op
         token_node.position := 0.U
@@ -111,55 +111,3 @@ object TokenNode {
     }
 }
 
-// TODO 检查token,mem的时序问题
-class PHeapLevel(val level: Int) extends Module {
-    val io = IO(new Bundle {
-        val token_in = Input(new TokenNode)
-        val token_out = Output(new TokenNode)
-        val mem_in = Input(new Memory(get_data_depth(level + 1)))
-        val mem_out = Output(new Memory(get_data_depth(level)))
-    })
-    val memory = Module(new Memory(data_depth, rank_width, use_sram = true))
-    val token = RegInit(TokenNode.default)
-
-    token := token_in
-    token_out := token
-    mem_out := memory
-
-    def ~>(next: PHeapLevel) = {
-        next.io.token_in := this.io.token_out
-        this.io.mem_in := next.io.mem_out
-    }
-
-    def init_memory(): Unit = {
-        for(i <- 0 until get_data_depth(level)) {
-            val node = Node.init(level, 0)
-            write(memory, i, node)
-        }
-    }
-
-    val addr = token_in.position
-
-    when (!io.token_in.op.pop) {
-        val stored_node = read(memory, addr)
-
-        when (!stored_node.value.existing) {
-            val newNode = read(memory, addr)
-            newNode.capacity -= 1
-            write(memory, addr, newNode)
-            token.op = Operator.nop
-        } .elsewise (stored_node.value < token.entry) {
-            val newNode = Wire(Node.init(level, token.entry))
-            write(memory, addr, newNode)
-            token.entry := stored_node.value
-        } .otherwise { }
-
-        val lc_pos = get_lc_pos(level, token.position)
-        val rc_pos = lc_pos + 1
-        val lc_node = read(mem_in, lc_pos)
-        token.position := Mux(lc_node.capacity > 0, lc_pos, rc_pos)
-        
-    } .otherwise {
-
-    }
-}
