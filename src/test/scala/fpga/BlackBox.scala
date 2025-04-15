@@ -18,6 +18,7 @@ object BlackBox {
 
     // push, pop, replace ratio
     val ratio = (0.3, 0.3, 0.4)
+    val op_nop = -1
     val op_push = 0
     val op_pop = 1
     val op_replace = 2
@@ -35,6 +36,15 @@ object BlackBox {
         val entries = pq.io.dbg_port.get.map(_.rank.peek().litValue)
         println(f"${tag}%-8s: ${entries.mkString("[", ", ", "]")}")
 
+    }
+
+    def nop[PQ <: PriorityQueueTrait](implicit pq: PQ, std_pq: PriorityQueue[(Int, Int)]): Unit = {
+        pq.io.op_in.push.existing.poke(false.B)
+        pq.io.op_in.push.rank.poke(-1.S(rank_width.W).asUInt)
+        pq.io.op_in.push.metadata.poke(0.U)
+        pq.io.op_in.pop.poke(false.B)
+        pq.clock.step()
+        if(debug) debug_print("nop")
     }
 
     // push a new entry into the priority queue
@@ -94,6 +104,13 @@ object BlackBox {
         (0 until num_ops).map(i => if (i % 2 == 0) op_push else op_pop).toArray
     }
 
+    def pheap_ops(): Array[Int] = {
+        val ops = Array.fill(num_ops)(to_op(random.nextDouble()))
+        ops.zipWithIndex.flatMap { case (op, idx) =>
+            Array(op, op_nop, op_nop)
+        }
+    }
+
     // the test body
     def test_black_box[PQ <: PriorityQueueTrait](c: PQ, test_ops: Array[Int]): Unit = {
         // generate the cold start numbers and the test numbers
@@ -115,6 +132,7 @@ object BlackBox {
         // test the priority queue
         test_ops.zipWithIndex.foreach { case (op, i) =>
             op match {
+                case `op_nop` => nop
                 case `op_push` => push(test_nums(i), i)
                 case `op_pop` => pop
                 case `op_replace` => replace(test_nums(i), i)

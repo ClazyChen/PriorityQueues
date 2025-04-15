@@ -2,93 +2,87 @@ package fpga.pheap
 
 import chisel3._
 import chisel3.util._
+import fpga._
 import fpga.mem._
 import fpga.Const._
-
-def get_capacity(level: Int) = ((1 << (count_of_levels + 1 - level)) - 1)
-
-def capacity_width(level: Int) = log2Ceil(get_capacity(level))
-
-def position_width(level: Int) = if(level <= 1) 1 else level - 1
-
-def get_data_depth(level: Int) = 1 << position_width(level)
-
-// 这里idx是在整个堆中的索引,pos是当前level中的索引
-def idx2pos(level: Int, idx: Int) = if(level <= 1) 1 else idx(level - 2, 0)
-    
-def pos2idx(level: Int, pos: Int) = if(level <= 1) 0 else (1 << (level - 1)) + pos
-    
-def get_lc_pos(level: Int, pos: Int): Int = {
-    val parent_idx = pos2idx(level, pos)
-    val lc_idx = 2 * parent_idx
-    idx2pos(lc_idx)
-}
-def get_rc_pos(level: Int, pos: Int): Int = {
-    val parent_idx = pos2idx(level, pos)
-    val rc_idx = 2 * parent_idx + 1
-    idx2pos(rc_idx)
-}
+import fpga.pheap.Param._
 
 
 class Node(val level: Int) extends Bundle {
     val entry = new Entry
-    val capacity = UInt(capacity_width(level).W)
+    val capacity = UInt(capacity_width(level).W) // 不同层的Node大小不一样
 }
 
 object Node {
-    def init(level: Int, entry: Entry, capacity: Int = get_capacity(level)): Node = {
+    def init(level: Int, entry: Entry, capacity: Int = -1): Node = {
+        val cap = if (capacity == -1) get_capacity(level) else capacity
         val node = Wire(new Node(level))
         node.entry := entry
-        node.capacity := capacity
+        node.capacity := cap.U
         node
-    }
-
-    def active(level: Int, entry: Entry): Node = {
-        val node = Wire(new Node(level))
-
     }
 }
 
+// Memory 模块的 IO 端口定义
+class MemoryIO(
+    val level: Int,
+    val data_width: Int = rank_width
+) extends Bundle {
+    val r = new ReadPort(position_width(level), data_width)
+    val w = new WritePort(position_width(level), data_width)
+}
 
 
 class Memory (
-    val data_depth: Int
+    val level: Int,
     val data_width: Int = rank_width,        
     val use_sram: Boolean = use_sram_param     
 ) extends Module {
-    val addr_width = log2Ceil(data_depth)
-    val io = IO(new Bundle{
-        val r = new ReadPort(addr_width, data_width)
-        val w = new WritePort(addr_width, data_width)
-    })
+    val data_depth = get_data_depth(level)
+    val addr_width = position_width(level)
 
-    // Sram读有延迟,写无延迟
+    val io = IO(new MemoryIO(addr_width, data_width))
+
     val mem = if(use_sram) Module(new Sram(data_depth, data_width))
             else Module(new FFMem(data_depth, data_width))
+
+    mem.getRPort <> io.r
+    mem.getWPort <> io.w
+
+    def write(addr: UInt, data: UInt) = mem.write(addr, data)
+    def read(addr: UInt) = mem.read(addr)
     
-    mem.io.r.en   := io.r.en
-    mem.io.r.addr := io.r.addr
-    mem.io.w.en   := io.w.en
-    mem.io.w.addr := io.w.addr
-    mem.io.w.data := io.w.data
-    io.r.data := mem.io.r.data
-}
+    // mem.getRPort.en   := io.r.en
+    // mem.getRPort.addr := io.r.addr
+    // mem.getWPort.en   := io.w.en
+    // mem.getWPort.addr := io.w.addr
+    // mem.getWPort.data := io.w.data
+    // io.r.data := mem.getRPort.data
 
-def read(level: Int, memory: Memory, addr: UInt): Node = {
-    memory.io.r.en   := true.B
-    memory.io.r.addr := addr
-    memory.io.w.en   := false.B
-    memory.io.w.addr := DontCare
-    memory.io.w.data := DontCare
-    memory.io.data_out.asTypeOf(new Node(level))
-}
+    // 在Ports.scala里面有定义
+    // Encapsulated read operation.
+    // 'level' could be used to tailor the returned Node (e.g., for type casting or pipelining considerations)
+    // def read(addr: UInt): Node = {
+    //     // Configure read port: activate read, disable write.
+    //     io.r.en   := true.B
+    //     io.r.addr := addr
+    //     io.w.en   := false.B
+    //     io.w.addr := DontCare
+    //     io.w.data := DontCare
 
-def write(level: Int, memory: Memory, addr: UInt, node: Node): Unit = {
-    memory.io.r.en   := false.B
-    memory.io.r.addr := DontCare
-    memory.io.w.en   := true.B
-    memory.io.w.addr := addr
-    memory.io.w.data := node.asUInt
+    //     // Return the data casted as Node. The 'level' parameter can be used for further customization.
+    //     io.r.data.asTypeOf(new Node(level))
+    // }
+
+    // // Encapsulated write operation.
+    // def write(addr: UInt, node: Node)  = {
+    //     // Configure write port: activate write, disable read.
+    //     io.r.en   := false.B
+    //     io.r.addr := DontCare
+    //     io.w.en   := true.B
+    //     io.w.addr := addr
+    //     io.w.data := node.asUInt
+    // }
 }
 
 
@@ -107,7 +101,7 @@ object TokenNode {
         token_node
     }
 
-    def init(level: Int, entry: Entry, op: Operator): TokenNode = {
+    def init(level: Int, entry: Entry = Entry.default, op: Operator = Operator.nop): TokenNode = {
         val token_node = Wire(new TokenNode(level)) 
         token_node.entry := entry
         token_node.op := op
