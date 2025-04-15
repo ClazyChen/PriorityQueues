@@ -22,6 +22,14 @@ class Entry extends Bundle {
     }
 }
 
+object entry_ops {
+    def swap(cmp: Bool, this_entry: Entry, that_entry: Entry): (Entry, Entry) = {
+        val pre_entry = Mux(cmp, this_entry, that_entry)
+        val next_entry = Mux(cmp, that_entry, this_entry)
+        (pre_entry, next_entry)
+    }
+}
+
 // the default entry (invalid entry)
 object Entry {
     def default: Entry = {
@@ -57,3 +65,4 @@ trait PriorityQueueTrait extends Module {
 
     val io: PQIO
 }
+
