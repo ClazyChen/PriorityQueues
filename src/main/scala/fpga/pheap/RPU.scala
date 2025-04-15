@@ -22,6 +22,60 @@ class RPU(val level: Int) extends Module {
     io.mem_out := memory
     io.token_out := TokenNode.default
 
+    val addr = token_in.position
+    val cur_node = read(level, memory, addr) // B[i]
+    val lc_pos = get_lc_pos(level, io.token_in.entry)
+    val rc_pos = lc_pos + 1.U
+    val lc_node = read(level + 1, mem_in, lc_pos)
+    val rc_node = read(level + 1, mem_in, rc_pos)
+    
+    val cmp_cur_lc = cur_node < lc_node
+    val cmp_cur_rc = cur_node < rc_node
+    val cmp_lc_rc = lc_node < rc_node
+
+    def local_enqueue() = {
+        when (!cur_node.entry.existing) {
+            val newNode = Wire(Node.init(level, io.token_in.entry))
+            newNode.capacity := newNode.capacity - 1.U
+            write(level, memory, addr, newNode)
+            token.op = Operator.nop
+        } .elsewhen (cur_node.entry < io.token_in.entry) {
+            write(level, memory, addr, Node.init(level, io.token_in.entry))
+            token.entry := cur_node.entry
+        } 
+        token.position := Mux(lc_node.capacity > 0, lc_pos, rc_pos)
+    }
+
+    def local_dequeue() = {
+        when (!lc_node.entry.existing && !rc_node.entry.existing) {
+            token.op = Operator.nop
+        } .elsewhen {
+            when(lc_node.entry < rc_node.entry) {
+                write(level, memory, addr, Node.init(level, rc_node.entry, cur_node.capacity))       
+                write(level + 1, mem_in, rc_pos, Node.init(level + 1, Entry.default, rc_node.capacity + 1))
+                token.position := rc_pos
+            } .elsewhen {
+                write(level, memory, addr, Node.init(level, lc_node.entry, cur_node.capacity))       
+                write(level + 1, mem_in, lc_pos, Node.init(level + 1, Entry.default, lc_node.capacity + 1))
+                token.position := lc_pos
+            }
+        }
+    }
+
+    def local_enqueue_dequeue() = {
+        when (!lc_node.entry.existing && !rc_node.entry.existing) {
+            token.op = Operator.nop
+        } .elsewhen {
+            when (!cmp_cur_lc && !cmp_cur_rc) {
+                token.op = Operator.nop
+            } .elsewhen {
+                write(level, memory, addr, Mux(cmp_lc_rc, rc_node, lc_node))
+                write(level + 1, mem_in, Mux(cmp_lc_rc, rc_pos, lc_pos), cur_node)
+                token.position := Mux(cmp_lc_rc, rc_pos, lc_pos)
+            }
+        }
+    }
+
     // 怎么保证操作完成后再将token向下传递? FSM?
     val sCycle0 :: sCycle1 :: sCycle2 :: sIdle :: Nil = Enum(4)
     val state = RegInit(sIdle)
@@ -48,29 +102,15 @@ class RPU(val level: Int) extends Module {
         }
     }
 
-    val addr = token_in.position
 
-    // 操作序列这里不做控制,交给上层处理
-    when (!io.token_in.op.pop) {
-        val stored_node = read(level, memory, addr)
-
-        when (!stored_node.value.existing) {
-            val newNode = Wire(Node.init(level, io.token_in.entry))
-            newNode.capacity := newNode.capacity - 1.U
-            write(level, memory, addr, newNode)
-            token.op = Operator.nop
-        } .elsewhen (stored_node.value < io.token_in.entry) {
-            write(level, memory, addr, Node.init(level, io.token_in.entry))
-            token.entry := stored_node.value
-        } 
-
-        val lc_pos = get_lc_pos(level, io.token_in.entry)
-        val rc_pos = lc_pos + 1.U
-        val lc_node = read(level + 1, mem_in, lc_pos)
-        token.position := Mux(lc_node.capacity > 0, lc_pos, rc_pos)
-        
+    when (io.token_in.op.pop) {
+        when(io.token_in.op.push.existing) {
+            local_dequeue
+        } .elsewhen {
+            local_enqueue_dequeue
+        }
     } .otherwise {
-
+        local_enqueue
     }
 
     def ~>(next: RPU) = {

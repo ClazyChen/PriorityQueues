@@ -17,10 +17,10 @@ class PHeap extends Module with PriorityQueueTrait {
         level_module
     })
 
-    io.entry_out := read(0, rpus.head.mem_out, 0)
+    io.entry_out := read(1, rpus.head.mem_out, 0)
     
-    val token = TokenNode.init(io.entry_in, io.op_in)
-    rpus.head.token_in := token
+    rpus.head.token_in := TokenNode.default(0)
+    rpus(1).token_in := TokenNode.init(1, io.entry_in, io.op_in)
 
     rpus.last.mem_in := DontCare
 

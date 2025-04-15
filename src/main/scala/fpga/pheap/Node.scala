@@ -5,42 +5,47 @@ import chisel3.util._
 import fpga.mem._
 import fpga.Const._
 
-def get_capacity(level: Int) = ((1 << (count_of_levels - level)) - 1)
+def get_capacity(level: Int) = ((1 << (count_of_levels + 1 - level)) - 1)
 
 def capacity_width(level: Int) = log2Ceil(get_capacity(level))
 
-def position_width(level: Int) = Mux(level == 0, 1, level)
+def position_width(level: Int) = if(level <= 1) 1 else level - 1
 
-def get_data_depth(level: Int) = 1 << level
+def get_data_depth(level: Int) = 1 << position_width(level)
 
 // 这里idx是在整个堆中的索引,pos是当前level中的索引
-def idx2pos(level: Int, idx: Int) = Mux(level == 0, 0, idx(level - 1, 0))
-
-def pos2idx(level: Int, pos: Int) = Mux(level == 0, 0, (1 << (level - 1)) + pos)
-
+def idx2pos(level: Int, idx: Int) = if(level <= 1) 1 else idx(level - 2, 0)
+    
+def pos2idx(level: Int, pos: Int) = if(level <= 1) 0 else (1 << (level - 1)) + pos
+    
 def get_lc_pos(level: Int, pos: Int): Int = {
     val parent_idx = pos2idx(level, pos)
-    val lc_idx = 2 * parent_idx + 1
+    val lc_idx = 2 * parent_idx
     idx2pos(lc_idx)
 }
 def get_rc_pos(level: Int, pos: Int): Int = {
     val parent_idx = pos2idx(level, pos)
-    val rc_idx = 2 * parent_idx + 2
+    val rc_idx = 2 * parent_idx + 1
     idx2pos(rc_idx)
 }
 
 
 class Node(val level: Int) extends Bundle {
-    val value = new Entry
+    val entry = new Entry
     val capacity = UInt(capacity_width(level).W)
 }
 
 object Node {
-    def init(level: Int, inValue: Entry): Node = {
+    def init(level: Int, entry: Entry, capacity: Int = get_capacity(level)): Node = {
         val node = Wire(new Node(level))
-        node.value := inValue
-        node.capacity := get_capacity(level).U
+        node.entry := entry
+        node.capacity := capacity
         node
+    }
+
+    def active(level: Int, entry: Entry): Node = {
+        val node = Wire(new Node(level))
+
     }
 }
 
