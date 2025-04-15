@@ -4,10 +4,7 @@ import chisel3._
 import chisel3.util._
 
 // a pseudo-dual-port memory with flip-flop
-class FFMem(
-    val data_depth: Int,
-    val data_width: Int,
-) extends Module with DualPortMemoryImpl {
+class FFMem(val data_depth: Int, val data_width: Int) extends Module with DualPortMemoryImpl {
     val addr_width = log2Ceil(data_depth)
 
     val io = IO(new Bundle{
@@ -35,5 +32,4 @@ class FFMem(
     // provide the IO interface
     def getRPort: ReadPort = io.r
     def getWPort: WritePort = io.w
-    
 }

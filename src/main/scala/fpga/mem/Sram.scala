@@ -4,19 +4,13 @@ import chisel3._
 import chisel3.util._
 
 // a pseudo-dual-port memory with SRAM
-class Sram(
-    val data_depth: Int,
-    val data_width: Int,
-) extends Module with DualPortMemoryImpl {
+class Sram(val data_depth: Int, val data_width: Int) extends Module with DualPortMemoryImpl {
     val addr_width = log2Ceil(data_depth)
-
     val io = IO(new Bundle{
         val r = new ReadPort(addr_width, data_width)
         val w = new WritePort(addr_width, data_width)
     })
-
     val mem = SyncReadMem(data_depth, UInt(data_width.W))
-
     io.r.data := DontCare
 
     // SRAM read has a one cycle delay
@@ -37,9 +31,7 @@ class Sram(
     when (same_addr_delay) {
         io.r.data := wdata_delay
     }
-
     // provide the IO interface
     def getRPort: ReadPort = io.r
     def getWPort: WritePort = io.w
-
 }

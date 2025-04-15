@@ -15,3 +15,5 @@
 # verilog
 *.v
 *.sv
+
+.bsp/

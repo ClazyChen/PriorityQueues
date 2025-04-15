@@ -26,14 +26,20 @@ object bheap_index_ops {
     global_index - ((1 << (level - 1)).U) + 1.U
   }
   // 获取左孩子在下一层的局部索引
+//  def get_lc_pos(parent_local_index: UInt, level: Int): UInt = {
+//    val parent_global: UInt = local_to_global(parent_local_index, level)
+//    global_to_local(parent_global * 2.U, level + 1)
+//  }
   def get_lc_pos(parent_local_index: UInt, level: Int): UInt = {
-    val parent_global: UInt = local_to_global(parent_local_index, level)
-    global_to_local(parent_global * 2.U, level + 1)
+    parent_local_index
   }
   // 获取右孩子在下一层的局部索引
+//  def get_rc_pos(parent_local_index: UInt, level: Int): UInt = {
+//    val parent_global: UInt = local_to_global(parent_local_index, level)
+//    global_to_local(parent_global * 2.U + 1.U, level + 1)
+//  }
   def get_rc_pos(parent_local_index: UInt, level: Int): UInt = {
-    val parent_global: UInt = local_to_global(parent_local_index, level)
-    global_to_local(parent_global * 2.U + 1.U, level + 1)
+    parent_local_index + 1.U
   }
   def index_to_level(i: Int): Int = {
     val level = math.floor(math.log(i) / math.log(2)).toInt + 1

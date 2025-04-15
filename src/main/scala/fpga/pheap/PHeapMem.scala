@@ -5,62 +5,78 @@ import chisel3.util._
 import fpga.mem._
 import fpga.pheap.Const._
 
+// The trait of a memory
+trait BHeapMemoryTrait {
+  // read and return the entry at addr
+  def read_block(addr: UInt, level: Int): BNode
+  // write data to the entry at addr
+  def write_block(addr: UInt, bnode: BNode): Unit
+  // idle the memory
+  def idle(): Unit
+}
 
-class PHeapMem(val data_depth: Int, val mem_impl: String) extends Module {
-  val addr_width = log2Ceil(data_depth)
+trait BHeapMemImpl extends BHeapMemoryTrait {
+  // get the IO interface from the module
+  def getRPort: ReadPort
+  def getWPort: WritePort
+  def read_block(addr: UInt, level: Int): BNode = {
+    val rport = getRPort
+    rport.en := true.B
+    rport.addr := addr
+    rport.data.asTypeOf(new BNode(level))
+  }
+  def write_block(addr: UInt, bnode: BNode): Unit = {
+    val wport = getWPort
+    wport.en := true.B
+    wport.addr := addr
+    wport.data := bnode.asUInt
+  }
+  def idle(): Unit = {
+    val rport = getRPort
+    val wport = getWPort
+    rport.en := false.B
+    wport.en := false.B
+    rport.addr := DontCare
+    wport.addr := DontCare
+    rport.data := DontCare
+  }
+}
+
+// 使用 SyncReadMem 实现伪双端口内存，并混入 BHeapMemImpl
+class PHeapMem(val level: Int, val mem_impl: String) extends Module with BHeapMemImpl {
+  val addr_width = log2Ceil(level)
+
+  // 对外暴露读写端口
   val io = IO(new Bundle {
     val r = new ReadPort(addr_width, data_width)
     val w = new WritePort(addr_width, data_width)
   })
-  val mem = mem_impl match {
-    case "FFMem" => Module(new FFMem(data_depth, data_width))
-    case "MemImpl"  => Module(new Sram(data_depth, data_width))
-  }
-  mem_impl match {
-    case "FFMem" =>
-      val ffmem = Module(new FFMem(data_depth, data_width))
-      ffmem.io.r.en := io.r.en
-      ffmem.io.r.addr := io.r.addr
-      io.r.data := ffmem.io.r.data
-      ffmem.io.w.en := io.w.en
-      ffmem.io.w.addr := io.w.addr
-      ffmem.io.w.data := io.w.data
-    case "SRAM" =>
-      val sram = Module(new Sram(data_depth, data_width))
-      sram.io.r.en := io.r.en
-      sram.io.r.addr := io.r.addr
-      io.r.data := sram.io.r.data
 
-      sram.io.w.en := io.w.en
-      sram.io.w.addr := io.w.addr
-      sram.io.w.data := io.w.data
+  // 底层存储器：同步读写
+  val mem = SyncReadMem(level, UInt(data_width.W))
+
+  // 读端口先置为 DontCare，稍后根据条件赋值
+  io.r.data := DontCare
+
+  // 读操作：SyncReadMem 有一拍延迟
+  when (io.r.en) {
+    // 发起读请求
+    io.r.data := mem.read(io.r.addr)
   }
 
-  def read_block(position: UInt, level: Int): BNode = {
-    io.r.en   := true.B
-    io.r.addr := position
-    // 这里将读出数据转换为 BNode 类型
-    io.r.data.asTypeOf(new BNode(level))
+  // 写操作
+  when (io.w.en) {
+    mem.write(io.w.addr, io.w.data)
   }
 
-  def write_block(position: UInt, bnode: BNode): Unit = {
-    io.r.en   := true.B
-    io.r.addr := position
-    io.r.data := bnode.asUInt
+  // 处理读写冲突（同地址同周期的写，下一周期读应该读到新数据而非旧数据）
+  val sameAddrDelay = RegNext(io.r.en && io.w.en && io.r.addr === io.w.addr)
+  val wdataDelay    = RegNext(io.w.data)
+  when (sameAddrDelay) {
+    io.r.data := wdataDelay
   }
+
+   // 实现 BHeapMemImpl 所需的 getRPort / getWPort
+  def getRPort: ReadPort  = io.r
+  def getWPort: WritePort = io.w
 }
-
-object bheap_mem_ops {
-  def connect(this_mem: PHeapMem, that_mem: PHeapMem): Unit = {
-    // 读端口
-    this_mem.io.r.en := that_mem.io.r.en
-    this_mem.io.r.addr := that_mem.io.r.addr
-    that_mem.io.r.data := this_mem.io.r.data
-
-    // 写端口
-    this_mem.io.w.en := that_mem.io.w.en
-    this_mem.io.w.addr := that_mem.io.w.addr
-    this_mem.io.w.data := that_mem.io.w.data
-  }
-}
-
