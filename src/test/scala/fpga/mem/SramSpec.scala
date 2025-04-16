@@ -7,19 +7,16 @@ import org.scalatest.matchers.should.Matchers
 
 class SramSpec extends AnyFlatSpec with ChiselScalatestTester with Matchers {
     behavior of "Sram"
-
     it should "perform basic read and write operations" in {
         test(new Sram(16, 32)) { dut =>
             // initial state should be idle
             dut.io.r.en.poke(false.B)
             dut.io.w.en.poke(false.B)
-            
             // write data
             dut.io.w.en.poke(true.B)
             dut.io.w.addr.poke(0.U)
             dut.io.w.data.poke(0x12345678.U)
             dut.clock.step()
-            
             // read data
             dut.io.w.en.poke(false.B)
             dut.io.r.en.poke(true.B)
@@ -28,19 +25,16 @@ class SramSpec extends AnyFlatSpec with ChiselScalatestTester with Matchers {
             dut.io.r.data.expect(0x12345678.U)
         }
     }
-
     it should "handle read-write conflicts correctly" in {
         test(new Sram(16, 32)) { dut =>
             // initial state
             dut.io.r.en.poke(false.B)
             dut.io.w.en.poke(false.B)
-            
             // write initial data
             dut.io.w.en.poke(true.B)
             dut.io.w.addr.poke(1.U)
             dut.io.w.data.poke(0x11111111.U)
             dut.clock.step()
-            
             // read and write to the same address simultaneously
             dut.io.r.en.poke(true.B)
             dut.io.w.en.poke(true.B)
@@ -48,7 +42,6 @@ class SramSpec extends AnyFlatSpec with ChiselScalatestTester with Matchers {
             dut.io.w.addr.poke(1.U)
             dut.io.w.data.poke(0x22222222.U)
             dut.clock.step()
-            
             // check read result (should return the newly written data)
             dut.io.r.data.expect(0x22222222.U)
         }

@@ -12,7 +12,6 @@ class Sram(val data_depth: Int, val data_width: Int) extends Module with DualPor
     })
     val mem = SyncReadMem(data_depth, UInt(data_width.W))
     io.r.data := DontCare
-
     // SRAM read has a one cycle delay
     when (io.r.en) {
         io.r.data := mem.read(io.r.addr)
@@ -26,7 +25,7 @@ class Sram(val data_depth: Int, val data_width: Int) extends Module with DualPor
     // because the SRAM read has a one cycle delay, we need to store the write information of the previous cycle to handle the conflict
     val same_addr_delay = RegNext(io.r.en && io.w.en && io.r.addr === io.w.addr)
     val wdata_delay = RegNext(io.w.data)
-    
+
     // when the read and write address are the same, output the written data
     when (same_addr_delay) {
         io.r.data := wdata_delay

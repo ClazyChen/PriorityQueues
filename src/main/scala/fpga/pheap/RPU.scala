@@ -6,10 +6,12 @@ import fpga._
 
 class RPU(val level: Int, val mem_impl: String) extends Module{
   val io = IO(new Bundle {
-    // Receives the token from the previous layer
+    // rceives the token from the previous layer
     val token_in = Input(new TNode(level))
-    // Output the token to the previous layer
+    // output the token to the previous layer
     val token_out = Output(new TNode(level + 1))
+    // access the memory interface
+    val mem = Flipped(new PHeapMemIO)
   })
 
   // set the token_block in this layer

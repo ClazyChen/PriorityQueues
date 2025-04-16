@@ -76,7 +76,7 @@ class PHeapMem(val level: Int, val mem_impl: String) extends Module with BHeapMe
     io.r.data := wdataDelay
   }
 
-   // 实现 BHeapMemImpl 所需的 getRPort / getWPort
+  // 实现 BHeapMemImpl 所需的 getRPort / getWPort
   def getRPort: ReadPort  = io.r
   def getWPort: WritePort = io.w
 }

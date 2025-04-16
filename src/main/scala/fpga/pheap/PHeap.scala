@@ -7,5 +7,6 @@ import fpga.PriorityQueueTrait
 class PHeap extends Module with PriorityQueueTrait{
   val io = new PQIO
 
+  val pheapMemInst = Module(new PHeapMem("Sram"))
 
 }
