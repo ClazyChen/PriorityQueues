@@ -5,7 +5,7 @@ import chisel3.util._
 
 // a pseudo-dual-port memory with SRAM
 class Sram(
-    val data_depth: Int,
+    val data_depth: Int, // 总数
     val data_width: Int,
 ) extends Module with DualPortMemoryImpl {
     val addr_width = log2Ceil(data_depth)
