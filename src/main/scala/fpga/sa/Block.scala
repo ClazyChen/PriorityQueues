@@ -21,9 +21,11 @@ class Block extends Module {
     io.op_out := op
 
     // use this function to generate what should be passed and what should be updated
-    def cal_forward_and_update(current_entry : Entry, push_entry : Entry) : (Entry, Entry) =  {
+    def cal_forward_and_update(current_entry : Entry, push_entry : Entry) 
+    : (Entry, Entry) =  {
         val dont_update_here = current_entry < push_entry
-        (Mux(dont_update_here,push_entry,current_entry),Mux(dont_update_here,current_entry,push_entry)) // cost depends on bit width
+        (Mux(dont_update_here, push_entry, current_entry),
+        Mux(dont_update_here, current_entry, push_entry)) // cost depends on bit width
     }
  
     val (forward_entry, update_entry) = cal_forward_and_update(entry, io.op_in.push)
