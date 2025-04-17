@@ -17,14 +17,26 @@ class PHeap extends Module with PriorityQueueTrait {
         level_module
     }
 
-    io.entry_out := rpus(1).io.mem_out.read(0)
+    io.entry_out := rpus(1).io.left_node_out
     
     rpus.head.io.token_in := TokenNode.init(0)
-    rpus(1).io.token_in := TokenNode.init(1, io.entry_in, io.op_in)
 
-    rpus.last.io.mem_in := DontCare
+    when(io.op_in.pop && io.op_in.push.existing && rpus(1).io.left_node_out.entry < io.op_in.push) {
+
+    } .otherwise {
+        rpus(1).io.token_in := TokenNode.init(1,io.op_in.push, io.op_in)
+    }
+
+    rpus.last.io.lc_node_in := DontCare
+    rpus.last.io.rc_node_in := DontCare
 
     for (i <- 0 until count_of_levels) {
         rpus(i) ~> rpus(i + 1)
     }
+
+    // if(debug) {
+    //      io.dbgPort.foreach { dbgPort =>
+    //          dbgPort := blocks.map(_.io.entry_out)
+    //      }
+    //  }
 }

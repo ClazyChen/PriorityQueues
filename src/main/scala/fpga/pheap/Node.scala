@@ -14,22 +14,12 @@ class Node(val level: Int) extends Bundle {
 }
 
 object Node {
-    def init(level: Int, entry: Entry, capacity: Int = -1): Node = {
-        val cap = if (capacity == -1) get_capacity(level) else capacity
+    def init(level: Int, entry: Entry, capacity: UInt): Node = {
         val node = Wire(new Node(level))
         node.entry := entry
-        node.capacity := cap.U
+        node.capacity := capacity
         node
     }
-}
-
-// Memory 模块的 IO 端口定义
-class MemoryIO(
-    val level: Int,
-    val data_width: Int = rank_width
-) extends Bundle {
-    val r = new ReadPort(position_width(level), data_width)
-    val w = new WritePort(position_width(level), data_width)
 }
 
 
@@ -41,48 +31,12 @@ class Memory (
     val data_depth = get_data_depth(level)
     val addr_width = position_width(level)
 
-    val io = IO(new MemoryIO(addr_width, data_width))
-
     val mem = if(use_sram) Module(new Sram(data_depth, data_width))
             else Module(new FFMem(data_depth, data_width))
 
-    mem.getRPort <> io.r
-    mem.getWPort <> io.w
-
-    def write(addr: UInt, data: UInt) = mem.write(addr, data)
-    def read(addr: UInt) = mem.read(addr)
+    def write(addr: UInt, node: Node) = mem.write(addr, node.asUInt)
+    def read(addr: UInt) = mem.read(addr).asTypeOf(new Node(level))
     
-    // mem.getRPort.en   := io.r.en
-    // mem.getRPort.addr := io.r.addr
-    // mem.getWPort.en   := io.w.en
-    // mem.getWPort.addr := io.w.addr
-    // mem.getWPort.data := io.w.data
-    // io.r.data := mem.getRPort.data
-
-    // 在Ports.scala里面有定义
-    // Encapsulated read operation.
-    // 'level' could be used to tailor the returned Node (e.g., for type casting or pipelining considerations)
-    // def read(addr: UInt): Node = {
-    //     // Configure read port: activate read, disable write.
-    //     io.r.en   := true.B
-    //     io.r.addr := addr
-    //     io.w.en   := false.B
-    //     io.w.addr := DontCare
-    //     io.w.data := DontCare
-
-    //     // Return the data casted as Node. The 'level' parameter can be used for further customization.
-    //     io.r.data.asTypeOf(new Node(level))
-    // }
-
-    // // Encapsulated write operation.
-    // def write(addr: UInt, node: Node)  = {
-    //     // Configure write port: activate write, disable read.
-    //     io.r.en   := false.B
-    //     io.r.addr := DontCare
-    //     io.w.en   := true.B
-    //     io.w.addr := addr
-    //     io.w.data := node.asUInt
-    // }
 }
 
 
