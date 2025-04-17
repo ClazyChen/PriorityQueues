@@ -54,20 +54,20 @@ class Cmp(val level : Int) extends Module {
     val right_child    = init_node(next_dual_node(1), level + 1)
 
     // 输出
-    val update_node = WireInit(Node.default(level))
-    // 和兄弟拼接在一起给下一模块写入
-    io.update_dual_node_out := Mux(position(0), 
+    val update_node          = WireInit(Node.default(level))
+    val update_dual_node_reg = RegNext(Mux(position(0),
         Cat(update_node.asUInt, dual_node(1).asUInt) ,
-        Cat(dual_node(0).asUInt, update_node.asUInt) )
+        Cat(dual_node(0).asUInt, update_node.asUInt) ))  // 和兄弟拼接在一起
+    io.update_dual_node_out := update_dual_node_reg
 
     val next_token     = Wire(new Token(level + 1))
     val next_token_reg = RegNext(next_token) // 第三个周期再传给下层RPU
     io.next_token_out := next_token_reg 
 
     // next token init
-    val select_child     = WireInit(false.B) // 0 left 1 right
+    val select_child     = WireInit(false.B)    // 0 left 1 right
     next_token.position := Cat(position, select_child.asUInt)
-    next_token.op       := op                  // unchanged op by default
+    next_token.op       := op                   // unchanged op by default
 
     val done     = WireInit(false.B)  // false by default
     val done_reg = RegNext(done)  // 下个周期传给write，write根据done决定enable_out
