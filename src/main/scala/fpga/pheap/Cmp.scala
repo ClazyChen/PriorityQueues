@@ -7,10 +7,7 @@ import fpga.Const._
 import fpga.pheap.Const._
 import fpga.mem._
 
-// 与pheap无关的Q: 
-// 时钟周期是如何计算出来的
-// 写SRAM需要的时间可以计算吗
-// 怎么让写SRAM变成两个周期
+
 class Cmp(val level : Int) extends Module {
     val io = IO(new Bundle {
         val enable_in            = Input(Bool())

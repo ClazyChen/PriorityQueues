@@ -7,6 +7,34 @@ import fpga.Const._
 import fpga.pheap.Const._
 import fpga.mem._
 
+/*
+input->read->cmp->write
+input: 外界给出输入信号
+input->read：写入token和read enable
+read: 根据token生成读信号和读地址
+read->cmp：读出父节点和子节点保存在read模块的寄存器中，并传递给cmp
+cmp: 比较，并生成下个RPU的token和更新的节点
+cmp->write：cmp模块的寄存器写入next token，和update dual node
+write: 收到cmp更新的节点，生成写信号、写地址、写数据
+
+Q:
+上游给的操作信号能保证是周期一开始时就到达吗?
+
+看移位寄存器测试的波形图，是下降沿才产生的操作信号，对于移位寄存器来说，
+收到输入信号后马上开始比较，然后上升沿写入。
+相当于用半个周期完成了比较等操作，而不是一个周期，因为上游的信号没及时给出。
+
+收到信号的那个周期算第一个周期还是下个周期才算第一个周期呢？
+
+因为怕不是周期一开始就收到操作信号，如果在该周期就进行read操作可能会导致时钟周期变长
+也有可能测试的波形图是为了直观看清输入信号才在下降沿给出信号的，导致我理解有误
+上面的input和read可能可以合并在一个周期
+*/
+
+// 与pheap无关的Q: 
+// 时钟周期是如何计算出来的
+// 写SRAM需要的时间可以计算吗
+// 怎么让写SRAM变成两个周期
 
 // a RPU in the PHeap, one RPU per level
 class RPU(val level : Int, use_mem : String) extends Module {
