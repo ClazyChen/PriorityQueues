@@ -20,6 +20,9 @@ class Entry extends Bundle {
         val replace = this < that
         (Mux(replace, this, that), Mux(replace, that, this))
     }
+
+    // no init flag
+    def no_init: Bool = this.asUInt === 0.U
 }
 
 // the default entry (invalid entry)
@@ -31,6 +34,8 @@ object Entry {
         entry.rank := -1.S(rank_width.W).asUInt // -1 is the lowest priority
         entry
     }
+
+    def getWidth: Int = (new Entry).getWidth
 }
 
 // an operator for the priority queue
