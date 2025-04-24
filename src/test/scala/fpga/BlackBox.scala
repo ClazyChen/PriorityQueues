@@ -121,6 +121,9 @@ object BlackBox {
         lazy implicit val std_pq = new PriorityQueue[(Int, Int)]()(Ordering.by((x: (Int, Int)) => (x._1, x._2)).reverse)
         lazy implicit val pq = c
 
+        // TODO 给时间完成初始化
+        pq.clock.step(4)
+
         // initialize the priority queue
         cold_start_nums.zipWithIndex.foreach { case (rank, metadata) =>
             push(rank, metadata)

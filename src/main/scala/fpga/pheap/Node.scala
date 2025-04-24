@@ -20,23 +20,30 @@ object Node {
         node.capacity := capacity
         node
     }
+
+    def default(level : Int): Node = {
+        val node       = Wire(new Node(level))
+        node.entry    := Entry.default
+        node.capacity := -1.S(capacity_width(level).W).asUInt // 满树初始就是全1
+        node
+    }
+
+    def getWidth(level : Int): Int = (new Node(level)).getWidth
+
 }
 
+class Pair(val level: Int) extends Bundle {
+    val first  = new Node(level)
+    val second = new Node(level)
+}
 
-class Memory (
-    val level: Int,
-    val data_width: Int = rank_width,        
-    val use_sram: Boolean = use_sram_param     
-) extends Module {
-    val data_depth = get_data_depth(level)
-    val addr_width = position_width(level)
-
-    val mem = if(use_sram) Module(new Sram(data_depth, data_width))
-            else Module(new FFMem(data_depth, data_width))
-
-    def write(addr: UInt, node: Node) = mem.write(addr, node.asUInt)
-    def read(addr: UInt) = mem.read(addr).asTypeOf(new Node(level))
-    
+object Pair {
+    def default(level: Int): Pair = {
+        val pair = Wire(new Pair(level))
+        pair.first  := Node.default(level)
+        pair.second := Node.default(level)
+        pair
+    }
 }
 
 
@@ -57,6 +64,7 @@ object TokenNode {
 
     def init(level: Int, entry: Entry = Entry.default, op: Operator = Operator.nop): TokenNode = {
         val token_node = Wire(new TokenNode(level)) 
+        // TODO op之中已经包含Entry了，所以这里可以不用再赋值
         token_node.entry := entry
         token_node.op := op
         token_node.position := 0.U

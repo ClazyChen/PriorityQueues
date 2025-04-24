@@ -13,11 +13,19 @@ object Param {
 
     def get_capacity(level: Int): UInt = ((1 << (count_of_levels + 1 - level)) - 1).U
 
-    def capacity_width(level: Int) = log2Ceil(((1 << (count_of_levels + 1 - level)) - 1))
+    def capacity_width(level: Int) = count_of_levels + 1 - level
 
     def position_width(level: Int) = if(level <= 1) 1 else level - 1
 
-    def get_data_depth(level: Int) = 1 << position_width(level)
+    // memory一次性读写2个节点
+    def get_pair_depth(level: Int) = if(level <= 1) 1 else 1 << (level - 2)
+    def get_pair_width(level: Int) = 2 * Node.getWidth(level)
+
+    def get_addr_width(level: Int) = if(level <= 2) 1 else 1 << (level - 3)
+
+    def pos2addr(level: Int, pos: UInt): UInt = if(level <= 2) 0.U else pos >> 1.U
+
+    def is_left(pos: UInt): Bool = pos % 2.U === 0.U
                 
     def get_lc_pos(level: Int, pos: UInt): UInt = 2.U * pos
 
