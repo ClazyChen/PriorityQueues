@@ -2,7 +2,6 @@ package fpga.mem
 
 import chisel3._
 import chisel3.util._
-import fpga.pheap.BNode
 
 // we implement two types of memory in this repo
 // 1. single port memory (1RW)

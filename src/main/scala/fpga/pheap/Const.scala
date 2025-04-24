@@ -1,5 +1,6 @@
 package fpga.pheap
 
+
 object Const {
 
   // number of levels in the pheap
@@ -8,6 +9,8 @@ object Const {
   // the width of the rank
   val data_width = 16
 
-  // number of entries in the pheap
-  val total_nodes = (1 << count_of_levels) - 1
+  // the type of memory
+  val mem_set = "Sram"
+
+
 }

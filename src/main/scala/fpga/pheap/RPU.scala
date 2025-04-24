@@ -4,88 +4,131 @@ import chisel3._
 import chisel3.util._
 import fpga._
 
-class RPU(val level: Int, val mem_impl: String) extends Module{
-  val io = IO(new Bundle {
-    // rceives the token from the previous layer
+class RPU(val level: Int) extends Module {
+  val io = IO(new Bundle{
     val token_in = Input(new TNode(level))
-    // output the token to the previous layer
-    val token_out = Output(new TNode(level + 1))
-    // access the memory interface
-    val mem = Flipped(new PHeapMemIO)
+    val token_out = Output(new TNode(level+1))
+
+    val this_node_pos_out = Output(UInt(level.W))
+    val this_node_read_en = Output(Bool())
+    val this_node_value_out = Output(new BNode(level))
+    val this_node_write_en = Output(new Bool())
+
+    val this_node_value_in = Input(new BNode(level))
+
+    val lc_node_pos_out = Output(UInt((level+1).W))
+    val lc_node_read_en = Output(Bool())
+
+    val lc_node_value_in = Input(new BNode(level+1))
+
+    val rc_node_pos_out = Output(UInt((level+1).W))
+    val rc_node_read_en = Output(Bool())
+
+    val rc_node_value_in = Input(new BNode(level+1))
   })
 
-  // set the token_block in this layer
+  // initialize the token_block in this layer
   val token_block = RegInit(TNode.default(level))
-  token_block := io.token_in
-
-  //  TODO：此处对于内存的访问方式可能存在问题
-  // access the memory in this layer
-  val current_level_mem = Module(new PHeapMem(level, mem_impl))
-  // access the memory in next layer
-  val next_level_mem    = Module(new PHeapMem(level + 1, mem_impl))
-
-  // obtain the location of the target node
-  val i = token_block.position
+  val next_token_block = RegInit(TNode.default(level+1))
 
   val B_block = RegInit(BNode.default(level))
-  B_block := current_level_mem.read_block(i, level)
+  val lc_pos = RegInit(UInt((level+1).W))
+  val lc_block = RegInit(BNode.default(level))
+  val rc_pos = RegInit(UInt((level+1).W))
+  val rc_block = RegInit(BNode.default(level))
 
-  // get value from its lc and rc
-  val lc_index = bheap_index_ops.get_lc_pos(i, level)
-  val lc_bnode = RegInit(BNode.default(level))
-  lc_bnode := next_level_mem.read_block(lc_index, level + 1)
+  io.token_out := DontCare
 
-  val rc_index = bheap_index_ops.get_rc_pos(i, level)
-  val rc_bnode = RegInit(BNode.default(level))
-  rc_bnode := next_level_mem.read_block(rc_index, level + 1)
+  // initialize the output value
+  io.this_node_pos_out := DontCare
+  io.this_node_write_en := false.B
+  io.this_node_read_en := false.B
 
-  val idle :: cycle1 :: cycle2 :: cycle3 :: cycle4 :: Nil = Enum(4)
-  val cycle_reg = RegInit(idle)
+  io.lc_node_pos_out := DontCare
+  io.lc_node_read_en := false.B
 
+  io.rc_node_pos_out := DontCare
+  io.rc_node_read_en := false.B
 
-  // TODO: 这个状态机的设计待进一步改进
-  val idle0 :: enq :: deq :: edq :: Nil = Enum(3)
-  val state_reg = RegInit(idle0)
+  val cycle1 :: cycle2 :: cycle3 :: Nil = Enum(3)
 
-  when(state_reg === enq) {
-    val v = token_block.value
-    when(!B_block.entry.existing) {                   // if B[i].active = false
-      B_block.entry := v                              // B[i].value <= v; B[i].active <= true;
+  val cycle_state = RegInit(cycle1)
 
-      io.token_out.operation := Operator.nop          // return done;
-      io.token_out.value := DontCare
-      io.token_out.position := DontCare
-    } .otherwise {                                    // elsif T[j].value < B[i].value
-      val enq_cmp_B = v < B_block.entry
-      val (next_B_entry, next_T_entry) = entry_ops.swap(enq_cmp_B, v, B_block.entry)   // swap T[j].value, B[i].value;
-      B_block.entry := next_B_entry
+  switch (cycle_state) {
+    is(cycle1) {
+      // cycle1: read the BNode from this layer and next layer
+      token_block := io.token_in
 
-      val enq_cmp_T = lc_bnode.capacity > 0.U                   // if B[left(i)].capacity > 0: T[j + 1].position <= left(i);
-      io.token_out.operation := token_block.operation           // set T[j+1].operation
-      io.token_out.value := next_T_entry                        // set T[j+1].value
-      io.token_out.position := Mux(enq_cmp_T, lc_index, rc_index)   // else: T(j + 1).position <= right(i);
+      io.this_node_read_en := true.B
+      io.this_node_pos_out := token_block.position - 1.U
+
+      lc_pos := token_block.position - 1.U
+      io.lc_node_read_en := true.B
+      io.lc_node_pos_out := lc_pos
+
+      rc_pos := token_block.position
+      io.rc_node_read_en := true.B
+      io.rc_node_pos_out := rc_pos
+
+      cycle_state := cycle2
     }
-    B_block.capacity := B_block.capacity - 1.U        // Decrement B[i].capacity;
-  }.elsewhen(state_reg === deq) {
-    when(!lc_bnode.entry.existing && !rc_bnode.entry.existing) {  // if both B[left(i)], B[right(i)] are inactive
-      B_block.entry := Entry.default                              // return done;
+    is(cycle2) {
+      // cycle2:
+      // 2.1: access the related value
+      B_block := io.this_node_value_in
+      lc_block := io.lc_node_value_in
+      rc_block := io.rc_node_value_in
 
-      io.token_out.operation := Operator.nop
-      io.token_out.value := DontCare
-      io.token_out.position := DontCare
-    } .otherwise {
-      val deq_cmp = lc_bnode.entry < rc_bnode.entry                   // Determine the node B[k] with largest value V;
-      B_block.entry := Mux(deq_cmp, lc_bnode.entry, rc_bnode.entry)   // B[i].value <= V;
+      // 2.2: perform push or pop operation
+      when(!token_block.operation.pop) {
+        // perform push operation
+        val v = token_block.value
+        when(!B_block.entry.existing) {
+          B_block.entry := v            // if B[i].active = false:
+                                        // B[i].value <= v; B[i].active = true;
+          next_token_block.operation := Operator.nop    // return done
+          next_token_block.value := DontCare
+          next_token_block.position := DontCare
+        } .otherwise {
+          val enq_cmp_B = v < B_block.entry   // elsif T[j].value < B[i].value
+          val (next_B_entry, next_T_entry) = entry_ops.swap(enq_cmp_B, v, B_block.entry)    // swap T[j].value, B[i].value
+          B_block.entry := next_B_entry
 
-      io.token_out.operation := token_block.operation                 // return not-done;
-      io.token_out.value := DontCare
-      io.token_out.position := Mux(deq_cmp, lc_index, rc_index)       // T[j + 1].position <= k;
+          next_token_block.operation := token_block.operation         // return not done
+          next_token_block.value := next_T_entry                      // set T[j+1].value
+          val enq_cmp_T = lc_block.capacity > 0.U                     // if B[left[i]].capacity > 0: T[j+1].position <= left(i)
+          next_token_block.position := Mux(enq_cmp_T, lc_pos, rc_pos)     // else: T[j+1].position <= right(i)
+        }
+        B_block.capacity := B_block.capacity - 1.U
+      }.otherwise {
+        // perform pop operation
+        when(!lc_block.entry.existing && !rc_block.entry.existing) {    // if both B[left(i)] and B[right(i)] are inactive
+          B_block.entry := Entry.default        // return done
+
+          next_token_block.operation := Operator.nop
+          next_token_block.value := DontCare
+          next_token_block.position := DontCare
+        } .otherwise {
+          val deq_cmp = lc_block.entry < rc_block.entry         // determine the node B[k] with the largest value v;
+          B_block.entry := Mux(deq_cmp, lc_block.entry, rc_block.entry)     // B[i].value <= v;
+
+          next_token_block.operation := token_block.operation     // return not done
+          next_token_block.value := DontCare
+          next_token_block.position := Mux(deq_cmp, lc_pos, rc_pos)   // T[j+1].position <= k
+        }
+        B_block.capacity := B_block.capacity + 1.U    // increment B[j].capacity
+      }
+      // 2.3: update the cycle state
+      cycle_state := cycle3
     }
-    B_block.capacity := B_block.capacity + 1.U        // increment B[k].capacity;
-  }.elsewhen(state_reg === edq) {
+    is(cycle3) {
+      // cycle3: write back to the memory
+      io.this_node_write_en := true.B
+      io.this_node_pos_out := token_block.position
+      io.this_node_value_out := B_block
+      io.token_out := next_token_block
 
+      cycle_state := cycle1
+    }
   }
-  // write data back to memory
-  current_level_mem.write_block(i, B_block)
 }
-

@@ -5,78 +5,63 @@ import chisel3.util._
 import fpga.mem._
 import fpga.pheap.Const._
 
-// The trait of a memory
-trait BHeapMemoryTrait {
-  // read and return the entry at addr
-  def read_block(addr: UInt, level: Int): BNode
-  // write data to the entry at addr
-  def write_block(addr: UInt, bnode: BNode): Unit
-  // idle the memory
-  def idle(): Unit
+class PHeapMemIO extends Bundle {
+  val read_signal = Input(Bool())
+  val write_signal = Input(Bool())
+  val operation_level = Input(UInt(log2Ceil(count_of_levels).W))
+  val operation_local_addr = Input(UInt(count_of_levels.W))
+  val data_in = Input(UInt(data_width.W))
+  val data_out = Output(UInt(data_width.W))
 }
 
-trait BHeapMemImpl extends BHeapMemoryTrait {
-  // get the IO interface from the module
-  def getRPort: ReadPort
-  def getWPort: WritePort
-  def read_block(addr: UInt, level: Int): BNode = {
-    val rport = getRPort
-    rport.en := true.B
-    rport.addr := addr
-    rport.data.asTypeOf(new BNode(level))
-  }
-  def write_block(addr: UInt, bnode: BNode): Unit = {
-    val wport = getWPort
-    wport.en := true.B
-    wport.addr := addr
-    wport.data := bnode.asUInt
-  }
-  def idle(): Unit = {
-    val rport = getRPort
-    val wport = getWPort
-    rport.en := false.B
-    wport.en := false.B
-    rport.addr := DontCare
-    wport.addr := DontCare
-    rport.data := DontCare
-  }
-}
-
-// 使用 SyncReadMem 实现伪双端口内存，并混入 BHeapMemImpl
-class PHeapMem(val level: Int, val mem_impl: String) extends Module with BHeapMemImpl {
-  val addr_width = log2Ceil(level)
-
-  // 对外暴露读写端口
-  val io = IO(new Bundle {
-    val r = new ReadPort(addr_width, data_width)
-    val w = new WritePort(addr_width, data_width)
-  })
-
-  // 底层存储器：同步读写
-  val mem = SyncReadMem(level, UInt(data_width.W))
-
-  // 读端口先置为 DontCare，稍后根据条件赋值
-  io.r.data := DontCare
-
-  // 读操作：SyncReadMem 有一拍延迟
-  when (io.r.en) {
-    // 发起读请求
-    io.r.data := mem.read(io.r.addr)
+// 顶层 PHeapMem 模块的实现
+class PHeapMem(val mem_impl: String) extends Module {
+  // 生成每个层级所需地址宽度，假设 count_of_levels 与 data_width 均在外部定义
+  val addr_widths: Seq[Int] = (1 to count_of_levels).map { level =>
+    log2Ceil(level)
   }
 
-  // 写操作
-  when (io.w.en) {
-    mem.write(io.w.addr, io.w.data)
+  // 定义顶层 IO
+  val io = IO(new PHeapMemIO)
+
+  // 生成各个层次的存储器模块，层级编号从 1 到 count_of_levels
+  val levelMems: Seq[PHeapLevelMem] = (1 to count_of_levels).map { i =>
+    Module(new PHeapLevelMem(i, mem_impl))
   }
 
-  // 处理读写冲突（同地址同周期的写，下一周期读应该读到新数据而非旧数据）
-  val sameAddrDelay = RegNext(io.r.en && io.w.en && io.r.addr === io.w.addr)
-  val wdataDelay    = RegNext(io.w.data)
-  when (sameAddrDelay) {
-    io.r.data := wdataDelay
+  // 根据 addr_widths 数组逐层生成各层的读端口集合
+  val read_ports: Seq[ReadPort] = addr_widths.map { width =>
+    Wire(new ReadPort(width, data_width))
+  }
+  // 根据 addr_widths 数组逐层生成各层的写端口集合
+  val write_ports: Seq[WritePort] = addr_widths.map { width =>
+    Wire(new WritePort(width, data_width))
   }
 
-  // 实现 BHeapMemImpl 所需的 getRPort / getWPort
-  def getRPort: ReadPort  = io.r
-  def getWPort: WritePort = io.w
+  // 将顶层读写请求路由到各层
+  for (i <- 0 until count_of_levels) {
+    // 对于读端口：当选择的操作层级等于 (i+1) 时使能读操作
+    val read_enable = (io.operation_level === (i + 1).U) && io.read_signal
+    read_ports(i).en   := read_enable
+    // 根据当前层地址宽度截取地址信号（低位部分）
+    read_ports(i).addr := io.operation_local_addr(read_ports(i).addr.getWidth - 1, 0)
+
+    // 对于写端口：当选择的操作层级等于 (i+1) 时使能写操作
+    val write_enable = (io.operation_level === (i + 1).U) && io.write_signal
+    write_ports(i).en   := write_enable
+    write_ports(i).addr := io.operation_local_addr(write_ports(i).addr.getWidth - 1, 0)
+    write_ports(i).data := io.data_in
+
+    // 将生成的端口与相应的子模块连接
+    levelMems(i).io.r <> read_ports(i)
+    levelMems(i).io.w <> write_ports(i)
+  }
+
+  // 根据操作层级，从各层的读端口中选择相应的数据输出
+  io.data_out := Mux1H(
+    (0 until count_of_levels).map(i =>
+      ((io.operation_level === (i+1).U) -> read_ports(i).data)
+    )
+  )
+
 }
