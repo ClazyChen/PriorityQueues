@@ -7,118 +7,138 @@ import fpga._
 import fpga.Const._
 import fpga.Node._
 
-""""
-    每三个时钟周期作为一个整体的clock
-    每层都用一个RPU处理(不考虑RPU数量上的优化) 
-    第一个clock:token读入新的token,计算position,left-child,right-child等数据
-    第二个clock:读数据,包括本层的SRAM和下一层的SRAM,比较器处理
-    第三个clock:写数据,准备向下一层传token等数据,可能发生写
-    测试时每六个CPU clock传入一组新操作
-""""
 
 // 分层实现PHeap
-// Q : 实现上的问题,每层RPU能否包含两层Sram?
-// 这样能简化实现但是好像和原文不是完全相符
 class RPU (val level : Int,val mem_type : String) extends Module {
     val io = IO(new Bundle {
         // token array 传递的数据
         val token_in = Input(new Token(level)) // 上一层RPU传入的token
         val token_out = Output(new Token(level + 1)) // 当前RPU向下一层传递的token
-
         // binary array 传递的数据
-        val prev_mem_in = Input(new Node(level)) // 上一层传入的node,用于edq
-        val mem_out = Output(new Node(level + 1)) // 用于输出当前的node
-        val dual_mem_in = Input(Vec(2,new Node(level + 1))) // 下一层传入的node，包含两个子节点
-        val dual_mem_out = Output(Vec(2,new Node(level))) // 下一层向上一层传的两个node
-        val addr_out = Output(UInt) // 输出地址信号
-        val addr_in = Input(UInt) // 输入的地址信号
+        val mem_out = Output(new Node(level + 1)) // 用于输出当前的node,用于外部接收,测试
+        val lc_node_in = Input(new Node(level + 1)) // 左孩子输入
+        val rc_node_in = Input(new Node(level + 1)) // 右孩子输入
+        val lc_node_out = Output(new Node(level)) // 当前RPU作为左孩子传递给上层RPU的node
+        val rc_node_out = Output(new Node(level)) // 当前RPU作为右孩子传递给上层RPU的node
+        val addr_in = Input(UInt(position_width(level - 1).W)) // 上一层传入的position
+        val addr_out = Output(UInt(position_width(level).W)) // 向下一层传入的position
+        val read_child_enable = Output(Bool()) // 读子孩子结点的使能信号
+        val output_prev_enable = Input(Bool()) // 向上一层传递两个结点的使能信号
     })
 
     // 用寄存器保存token
     val token = RegInit(Token.default(level))
-    io.token_out := token
-
+    token := io.token_in
     // 指定memory的实现方式
     val mem = Module(new MemBlock(level,mem_type))
-    io.mem_out := mem
 
-    // 从token获取当前RPU操作状态
-    switch (token.op) {
-        is (token.op.push.existing && token.op.pop) {
-            val state = State.edq
-        }
-        is (token.op.push.existing) {
-            val state = State.enq
-        }
-        is (token.op.pop) {
-            val state = State.deq
-        }
-        otherwise {
-            val state = State.nop
-        }
-    }
+    // 组合逻辑辅助信号
+    val read_left_index = cal_local_index(io.addr_in, level)
+    val read_right_index = read_left_index + 1.U
+    val lc_position =  get_lc_g_index(i) // 当前下标i的左孩子position
+    val rc_position =  get_rc_g_index(i) // 当前下标i的右孩子position
 
-    // 一些准备信号(组合逻辑)
-    val i = token.position // 获取下标索引i
-    val cur_l_index = PheapFunc.cal_local_index(i, level) // 当前要操作的结点的块内索引
-    val lc_g_index = PheapFunc.get_lc_g_index(i) // 获取当前结点索引i的左孩子结点的索引(global)
+    // 相关变量
+    val i = io.token_in.position // 读出i
+    val v = io.token_in.op.push // 读出v
+    val cur_node = new Node(level) // 当前结点
 
-    io.addr_out := lc_g_index // 向下一层传左孩子的global_index
+     // 设置比较器
+    val swap_enable = token.op.push < cur_node.value
+    val cmp_lc_rc = io.lc_node_in.value < io.rc_node_in.value
 
-    // 读左右孩子
-    when (io.addr_in =/= 0 && state =/= State.nop) {
-        val lc_l_index = PheapFunc.cal_local_index(lc_g_index, level) // 获取lc local_index
-        // Q：这样读vec是否可行？或许应该修改read一次读出连续的两个node（希望在一个时钟周期内读出两个node）
-        io.dual_mem_out(0) := read(lc_l_index, level)
-        io.dual_mem_out(1) := read(lc_l_index + 1, level)
-    }
+    // 时钟周期 状态寄存器
+    val idle :: cycle1 :: cycle2 :: cycle3 :: Nil = Enum(4)
+    val state = RegInit(idle)
 
     // FSM
-    val idle :: cycle1 :: cycle2 :: cycle3 :: Nil = Enum(4) // 周期，还没想好用在哪
-
-    switch(state) {
-        is (State.enq) {
-            val v = token.op.push
-            val target_node = mem.read(cur_l_index, level)
-            when (!target_node.value.existing) { // not-active
-                mem.write(cur_l_index, v)
-                // done
-                io.token_out.op := Operator.nop
-                io.token_out.position := 0.U
+    switch (state) {
+        // read token_in
+        is (cycle1) {
+            when (io.token_in.position) {
+                token := io.token_in // 读入token
+                io.read_child_enable := true.B // 读下一层的两个结点
+                io.addr_out := lc_position // 左孩子全局索引     
+                // 进入下一周期
+                state := cycle2   
             }
-            .otherwise { // active
-                val swap = target_node.value < token.op.push
-                when (swap) {
-                    mem.write(cur_l_index, v) //swap
-                    io.token_out.op.push := target_node
-                    io.token_out.op.pop := token.op.pop
-                    io.token_out.position := Mux(io.dual_mem_in(0).capacity > 0, lc_g_index, lc_g_index + 1.U)
+            .otherwise {}
+        }
+        is (cycle2) {
+            cur_node = mem.read(cal_local_index(i, level), level) // 读当前节点
+            when (io.output_prev_enable) {
+                io.lc_node_out := mem.read(read_left_index, level) // 读左孩子
+                io.rc_node_out := mem.read(read_right_index, level) // 读右孩子
+            }
+            .otherwise {}
+            // 进入下一周期
+            state := cycle3 
+        }
+        is (cycle3) {
+            // 状态转移 实现enqueue dequeue edq
+            when (token.op.push.existing && !token.op.pop) {
+                when (!cur_node.value.existing) {
+                    val new_node = new Node(level) // 要写入sram的结点
+                    new_node.value = token.op.push
+                    new_node.capacity = cur_node.capacity - 1.U
+                    mem.write(cal_local_index(i, level), new_node) // 写入
                 }
                 .otherwise {
-                    io.token_out := token
+                    val new_node = new Node(level)
+                    when (swap_enable) {
+                        new_node.value = token.op.push
+                        new_node.capacity = cur_node.capacity
+                        mem.write(cal_local_index(i, level),new_node) // swap
+                        // 传递给下一层RPU
+                        io.token_out.op.push.metadata := cur_node.metadata
+                        io.token_out.op.push.rank := cur_node.rank
+                    }.otherwise { // 不用swap
+                        io.token_out.op.push.metadata := token.op.push.metadata
+                        io.token_out.op.push.rank := token.op.push.rank
+                    }
+                    io.token_out.op.push.existing := token.op.push.existing
+                    io.token_out.op.pop := token.op.pop
+                    io.token_out.position := Mux(io.lc_node_in.capacity > 1, lc_position, rc_position)
                 }
+            }.elsewhen (token.op.pop && !token.op.push.existing) {
+                val new_node = new Node(level) // 向上一层传递的node
+                when (cmp_lc_rc) { // 左孩子的优先级高
+                    new_node = lc_node
+                    new_node.capacity = lc_node.capacity - 1.U
+                }.otherwise { // 右孩子的优先级高
+                    new_node = rc_node
+                    new_node.capacity = rc_node.capacity - 1.U
+                }
+                mem.write(cal_local_index(i, level), new_node)
+                io.token_out.op := token.op
+                io.token_out.position := Mux(cmp_lc_rc, lc_position, rc_position)
+            }.elsewhen (token.op.pop && token.op.push.existing) { // edq
+                val new_node = new Node(level)
+                
+            }.otherwise {
+                // do nothing
+            }          
+            state := cycle1
+        }
+        is (idle) {
+            // idle状态，不需要额外操作
+            when (io.token_in.push.existing || io.token_in.pop) {
+                state := cycle1
             }
-        }
-        is (State.deq) {
-            val is_lc = io.dual_mem_in(1) < io.dual_mem_in(0)
-            mem.write(cur_l_index, Mux(is_lc, io.dual_mem_in(0),io.dual_mem_in(1)))
-            // done
-            io.token_out.op := DontCare
-            io.token_out.position := Mux(is_lc, lc_g_index, lc_g_index + 1.U)
-        }
-        is (State.edq) {
-            
+            io.token_out = Token.default(level)
         }
         otherwise {
             // do nothing
         }
     }
 
-    // todo:connect all the rpus
+    // connect all the rpus
     def ~> (next : RPU) {
         this.io.token_out <> next.io.token_in
         this.io.addr_out <> next.io.addr_in
-        this.io.dual_mem_in <> next.io.dual_mem_out
+        this.io.lc_node_in <> next.io.lc_node_out
+        this.io.rc_node_in <> next.io.rc_node_out
+        this.io.read_child_enable <> next.io.output_prev_enable
     }
 
 }

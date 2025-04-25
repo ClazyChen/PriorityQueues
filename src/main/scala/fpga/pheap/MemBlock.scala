@@ -35,21 +35,17 @@ trait MemoryTrait {
         w.data := DontCare 
     }
 }
-
 // 每一层RPU内部的Memory
-class MemBlock (val level : Int,val mem_type : String) extends Module with MemoryTrait {
-    
+class MemBlock (val level : Int,val mem_type : String) extends Module with MemoryTrait { 
     // 计算addr_width和data_width
     val local_data_depth = UInt(1 << (level - 1))
     val local_data_width = (Node.asUInt).W
-    val local_addr_width = log2Ceil(local_data_depth + 1) //Q : 这里不写 +1 有没有问题？
-
+    val local_addr_width = log2Ceil(local_data_depth + 1) 
     // 对外暴露的接口
     val io = IO(new Bundle {
         val r = new ReadPort(local_addr_width, local_data_width) // 读
         val w = new WritePort(local_addr_width, local_data_width) // 写
     })
-
     // 根据需求选用不同的memory
     switch (mem_type) {
         is ("Sram") {
@@ -65,14 +61,10 @@ class MemBlock (val level : Int,val mem_type : String) extends Module with Memor
             val memory = new SinglePortFFMem(local_data_depth,local_data_width)
         }
     }
-
     // 端口连接
     memory.io.r <> io.r
     memory.io.w <> io.w
-
     // 获取MemoryBlock端口
     def getRPort: ReadPort  = io.r
     def getWPort: WritePort = io.w
-
 }
-
