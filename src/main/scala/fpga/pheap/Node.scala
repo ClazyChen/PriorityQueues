@@ -20,7 +20,7 @@ object capacity_width {
 // B[i].capacity: this field contains the number of inactive node in this subtree.
 class BNode(val level: Int) extends Bundle {
   val entry = new Entry // B[i].value :: B[i].active
-  val capacity = UInt(capacity_width(count_of_levels).W)
+  val capacity = UInt(count_of_levels.W)
   def < (that: BNode): Bool = (this.entry < that.entry) || !that.entry.existing
 
 }
@@ -40,7 +40,8 @@ object BNode {
 class TNode(val level: Int) extends Bundle {
   val operation = new Operator
   val value = new Entry
-  val position = UInt(level.W)
+  // TODO: 需要调整位宽
+  val position = UInt(count_of_levels.W)
 }
 
 object TNode {
@@ -71,12 +72,6 @@ object TreeIndexing {
   def get_nodes_at_level(level: Int): Int = 1 << (level - 1)
 
   def level_start_index(level: Int): Int = (1 << (level - 1)) - 1
-
-  /*
-                  0
-              1       2
-           3    4   5    6
-   */
 
 }
 
