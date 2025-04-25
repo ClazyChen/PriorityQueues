@@ -12,6 +12,7 @@ object capacity_width {
     val max_capacity = (1 << (count_of_levels - level + 1))
     log2Ceil(max_capacity)
   }
+
 }
 
 // B[i].active: indicate this node is active or not.
@@ -19,7 +20,7 @@ object capacity_width {
 // B[i].capacity: this field contains the number of inactive node in this subtree.
 class BNode(val level: Int) extends Bundle {
   val entry = new Entry // B[i].value :: B[i].active
-  val capacity = UInt(capacity_width(level).W)
+  val capacity = UInt(capacity_width(count_of_levels).W)
   def < (that: BNode): Bool = (this.entry < that.entry) || !that.entry.existing
 
 }
@@ -27,8 +28,7 @@ class BNode(val level: Int) extends Bundle {
 object BNode {
   def default(level: Int): BNode = {
     val bnode = Wire(new BNode(level))
-    bnode.entry.existing := false.B
-    bnode.entry.metadata := 0.U(metadata_width.W)
+    bnode.entry := Entry.default
     bnode.capacity := ((1 << (count_of_levels - level)) - 1).U
     bnode
   }
@@ -72,15 +72,21 @@ object TreeIndexing {
 
   def level_start_index(level: Int): Int = (1 << (level - 1)) - 1
 
+  /*
+                  0
+              1       2
+           3    4   5    6
+   */
+
 }
 
-class BNodeReadPort(level: Int) extends Bundle {
+class BNode_read_port(level: Int) extends Bundle {
   val en = Input(Bool())
   val addr = Input(UInt(log2Ceil(1 << (level - 1)).W)) // 每层 2^(level-1) 个节点
   val data = Output(new BNode(level))
 }
 
-class BNodeWritePort(level: Int) extends Bundle {
+class BNode_write_port(level: Int) extends Bundle {
   val addr = Input(UInt(log2Ceil(1 << (level - 1)).W))
   val data = Input(new BNode(level))
   val en   = Input(Bool())

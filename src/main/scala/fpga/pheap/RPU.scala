@@ -32,22 +32,22 @@ class RPU(val level: Int) extends Module {
   val next_token_block = RegInit(TNode.default(level+1))
 
   val B_block = RegInit(BNode.default(level))
-  val lc_pos = RegInit(UInt((level+1).W))
+  val lc_pos = Reg(UInt((level + 1).W))
   val lc_block = RegInit(BNode.default(level))
-  val rc_pos = RegInit(UInt((level+1).W))
+  val rc_pos = Reg(UInt((level + 1).W))
   val rc_block = RegInit(BNode.default(level))
 
-  io.token_out := DontCare
-
+  io.token_out := TNode.default(level)
   // initialize the output value
-  io.this_node_pos_out := DontCare
+  io.this_node_pos_out := 0.U
   io.this_node_write_en := false.B
   io.this_node_read_en := false.B
+  io.this_node_value_out := BNode.default(level)
 
-  io.lc_node_pos_out := DontCare
+  io.lc_node_pos_out := 0.U
   io.lc_node_read_en := false.B
 
-  io.rc_node_pos_out := DontCare
+  io.rc_node_pos_out := 0.U
   io.rc_node_read_en := false.B
 
   val cycle1 :: cycle2 :: cycle3 :: Nil = Enum(3)
@@ -80,7 +80,7 @@ class RPU(val level: Int) extends Module {
       rc_block := io.rc_node_value_in
 
       // 2.2: perform push or pop operation
-      when(!token_block.operation.pop) {
+      when(!token_block.operation.pop && token_block.value.existing) {
         // perform push operation
         val v = token_block.value
         when(!B_block.entry.existing) {
@@ -100,7 +100,7 @@ class RPU(val level: Int) extends Module {
           next_token_block.position := Mux(enq_cmp_T, lc_pos, rc_pos)     // else: T[j+1].position <= right(i)
         }
         B_block.capacity := B_block.capacity - 1.U
-      }.otherwise {
+      }.elsewhen(token_block.operation.pop) {
         // perform pop operation
         when(!lc_block.entry.existing && !rc_block.entry.existing) {    // if both B[left(i)] and B[right(i)] are inactive
           B_block.entry := Entry.default        // return done
@@ -123,11 +123,12 @@ class RPU(val level: Int) extends Module {
     }
     is(cycle3) {
       // cycle3: write back to the memory
-      io.this_node_write_en := true.B
-      io.this_node_pos_out := token_block.position
-      io.this_node_value_out := B_block
-      io.token_out := next_token_block
-
+      when(token_block.operation.pop || token_block.value.existing) {
+        io.this_node_write_en := true.B
+        io.this_node_pos_out := token_block.position - 1.U
+        io.this_node_value_out := B_block
+        io.token_out := next_token_block
+      }
       cycle_state := cycle1
     }
   }

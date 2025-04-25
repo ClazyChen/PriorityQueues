@@ -8,9 +8,8 @@ import fpga.pheap.Const._
 
 class PHeap extends Module {
   val io = IO(new Bundle {
-    val op_in = new Operator
-    val entry_in = new Entry
-    val entry_out = new Entry
+    val op_in = Input(new Operator)
+    val entry_out = Output(new Entry)
   })
 
   /*
@@ -31,19 +30,20 @@ Node :    1   2   3   4   5   6   7   8   9  10  11  12  13  14  15
 
   val rpus = (1 to count_of_levels).map(level => Module(new RPU(level)))
 
-  rpus(0).io.token_in.operation := io.op_in
+  rpus(0).io.token_in.operation.pop := io.op_in.pop
+  rpus(0).io.token_in.operation.push := DontCare
   rpus(0).io.token_in.position := 1.U
-  rpus(0).io.token_in.value := io.entry_in
+  rpus(0).io.token_in.value := io.op_in.push
 
-  io.entry_out := B(0)
+  io.entry_out := B(0).entry
 
-  for(i <- 0 until count_of_levels ) {
+  for(i <- 0 until count_of_levels - 1) {
     rpus(i+1).io.token_in := rpus(i).io.token_out
   }
 
   // 分层端口
-  def mkReadPorts = (1 to count_of_levels).map(level => Wire(new BNodeReadPort(level)))
-  def mkWritePorts = (1 to count_of_levels).map(level => Wire(new BNodeWritePort(level)))
+  def mkReadPorts = (1 to count_of_levels).map(level => Wire(new BNode_read_port(level)))
+  def mkWritePorts = (1 to count_of_levels).map(level => Wire(new BNode_write_port(level)))
 
   val b_this_read_ports  = mkReadPorts
   val b_lc_read_ports    = mkReadPorts
@@ -73,6 +73,14 @@ Node :    1   2   3   4   5   6   7   8   9  10  11  12  13  14  15
     rpu.io.rc_node_value_in := b_rc_read_ports(j).data
   }
 
+  b_lc_read_ports(0).en := false.B
+  b_lc_read_ports(0).addr := 0.U
+  b_lc_read_ports(0).data := BNode.default(1)
+
+  b_rc_read_ports(0).en := false.B
+  b_rc_read_ports(0).addr := 0.U
+  b_rc_read_ports(0).data := BNode.default(1)
+
   // 最后一层 RPU 特殊处理
   val last = count_of_levels - 1
   val last_rpu = rpus.last
@@ -89,12 +97,12 @@ Node :    1   2   3   4   5   6   7   8   9  10  11  12  13  14  15
   last_rpu.io.rc_node_value_in := BNode.default(count_of_levels + 1)
 
   // 通用函数：根据端口读写 B 数组
-  def connect_read_port(read: BNodeReadPort, level: Int): Unit = {
+  def connect_read_port(read: BNode_read_port, level: Int): Unit = {
     val base = TreeIndexing.level_start_index(level)
     read.data := Mux(read.en, B(base.U + read.addr), BNode.default(level))
   }
 
-  def connect_write_port(write: BNodeWritePort, level: Int): Unit = {
+  def connect_write_port(write: BNode_write_port, level: Int): Unit = {
     val base = TreeIndexing.level_start_index(level)
     when(write.en) {
       B(base.U + write.addr) := write.data
