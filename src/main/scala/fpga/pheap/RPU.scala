@@ -92,6 +92,9 @@ class RPU(val level: Int) extends Module {
       when(!token_block.operation.pop || token_block.value.existing) {
         // 2.2.1: perform push operation
         val v = token_block.value
+
+        printf(p"[cycle2] level=$level, token.pos=${token_block.position}, token.value.rank=${token_block.value.rank}, lc=$lc_pos, rc=$rc_pos\n")
+
         when(!B_block.entry.existing) {
           next_B_block.entry := v // if B[i].active = false: B[i].value <= v; B[i].active = true;
 

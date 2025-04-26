@@ -30,13 +30,12 @@ class BNodeTest extends AnyFreeSpec with ChiselScalatestTester {
       }
 
       // Step: push a sequence of values
-      val test_rank_values = Seq((11, 1), (7, 2), (4, 3))
+      val test_rank_values = Seq((7, 2), (13, 3), (2, 1), (23, 4))
       for ((v, u) <- test_rank_values) {
         c.io.op_in.pop.poke(true.B)
         c.io.op_in.push.rank.poke(v.U)
         c.io.op_in.push.existing.poke(true.B)
         c.io.op_in.push.metadata.poke(u.U)
-
         c.clock.step()
 
         c.io.op_in.pop.poke(false.B)
