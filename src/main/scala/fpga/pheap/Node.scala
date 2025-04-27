@@ -29,7 +29,13 @@ object BNode {
   def default(level: Int): BNode = {
     val bnode = Wire(new BNode(level))
     bnode.entry := Entry.default
-    bnode.capacity := ((1 << (count_of_levels - level)) - 1).U
+    bnode.capacity := ((1 << (count_of_levels - level + 1)) - 1).U
+    bnode
+  }
+  def last: BNode = {
+    val bnode = Wire(new BNode(count_of_levels))
+    bnode.entry := Entry.default
+    bnode.capacity := 0.U
     bnode
   }
 }
@@ -49,7 +55,7 @@ object TNode {
     val tnode = Wire(new TNode(level))
     tnode.operation := Operator.nop
     tnode.value := Entry.default
-    tnode.position := 0.U
+    tnode.position := 1.U
     tnode
   }
 }
@@ -65,24 +71,28 @@ object TreeIndexing {
   // 给定层级和在该层的 offset（从 0 开始）返回对应的索引（从 0 开始）
   def get_index_from_level(level: Int, offset: Int): Int = (1 << (level - 1)) - 1 + offset
 
-  // 给定层级返回该层起始索引
-  def get_level_start_index(level: Int): Int = (1 << (level - 1)) - 1
-
   // 给定层级返回该层包含的节点数量
   def get_nodes_at_level(level: Int): Int = 1 << (level - 1)
 
+  // 给定层级返回起始索引
   def level_start_index(level: Int): Int = (1 << (level - 1)) - 1
+
+  def get_level_start_index(level: Int): Int = (1 << (level - 1))
+
+  def get_lc_pos(level: Int, offset: UInt): UInt = ((get_level_start_index(level).U + offset - 1.U) * 2.U) - get_level_start_index(level + 1).U + 1.U
+
+  def get_rc_pos(level: Int, offset: UInt): UInt = ((get_level_start_index(level).U + offset - 1.U) * 2.U) - get_level_start_index(level + 1).U + 2.U
 
 }
 
 class BNode_read_port(level: Int) extends Bundle {
   val en = Input(Bool())
-  val addr = Input(UInt(log2Ceil(1 << (level - 1)).W)) // 每层 2^(level-1) 个节点
+  val addr = Input(UInt(count_of_levels.W)) // 每层 2^(level-1) 个节点
   val data = Output(new BNode(level))
 }
 
 class BNode_write_port(level: Int) extends Bundle {
-  val addr = Input(UInt(log2Ceil(1 << (level - 1)).W))
+  val addr = Input(UInt(count_of_levels.W))
   val data = Input(new BNode(level))
   val en   = Input(Bool())
 }

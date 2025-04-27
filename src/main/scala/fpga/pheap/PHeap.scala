@@ -11,9 +11,14 @@ index table:
           B[1]        B[2]          level2  T[2]  rpu(1)
      B[3]   B[4]  B[5]    B[6]      level3  T[3]  rpu(2)
                   1
+                  1
             2           3
-      4       5     6       7
-
+            1           2
+       4       5     6       7
+       1       2     3       4
+   8   9   10   11 12  13  14  15
+   1   2   3    4   5   6  7    8
+get_level_from_index:
 Index :   0   1   2   3   4   5   6   7   8   9  10  11  12  13  14
 Level :   1   2   2   3   3   3   3   4   4   4   4   4   4   4   4
 Node :    1   2   3   4   5   6   7   8   9  10  11  12  13  14  15
@@ -85,8 +90,8 @@ class PHeap extends Module {
   this_bnode_write_ports(last).addr := last_rpu.io.this_node_pos_out
   this_bnode_write_ports(last).data := last_rpu.io.this_node_value_out
 
-  last_rpu.io.lc_node_value_in := BNode.default(count_of_levels + 1)
-  last_rpu.io.rc_node_value_in := BNode.default(count_of_levels + 1)
+  last_rpu.io.lc_node_value_in := BNode.last
+  last_rpu.io.rc_node_value_in := BNode.last
 
   // 第一层rwport做特殊处理
   lc_bnode_read_ports(0).en := false.B

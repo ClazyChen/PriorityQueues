@@ -3,7 +3,7 @@ package fpga.pheap
 import chisel3._
 import chisel3.util._
 import fpga._
-
+import fpga.pheap.Const._
 class RPU(val level: Int) extends Module {
   val io = IO(new Bundle {
     val token_in = Input(new TNode(level))
@@ -33,13 +33,11 @@ class RPU(val level: Int) extends Module {
   val B_block = WireDefault(BNode.default(level))
   val next_B_block = RegInit(BNode.default(level))
 
-  val lc_pos = Reg(UInt((level + 1).W))
-  val rc_pos = Reg(UInt((level + 1).W))
+  val lc_pos = Reg(UInt(count_of_levels.W))
+  val rc_pos = Reg(UInt(count_of_levels.W))
 
   val lc_block = WireDefault(BNode.default(level))
   val rc_block = WireDefault(BNode.default(level))
-
-  val counter = RegInit(0.U)
 
   // initialize the output value
   io.token_out := TNode.default(level)
@@ -69,17 +67,18 @@ class RPU(val level: Int) extends Module {
         io.this_node_read_en := true.B
         io.this_node_pos_out := io.token_in.position - 1.U
 
-        lc_pos := io.token_in.position
-        rc_pos := io.token_in.position + 1.U
+        lc_pos := TreeIndexing.get_lc_pos(level, io.token_in.position)
+        rc_pos := TreeIndexing.get_rc_pos(level, io.token_in.position)
 
         io.lc_node_read_en := true.B
-        io.this_node_pos_out := io.token_in.position - 1.U
+        io.lc_node_pos_out := lc_pos - 1.U
 
         io.rc_node_read_en := true.B
-        io.rc_node_pos_out := io.token_in.position
+        io.rc_node_pos_out := rc_pos - 1.U
+
+        // 1.2: update the cycle state
+        cycle_state := cycle2
       }
-      // 1.2: update the cycle state
-      cycle_state := cycle2
     }
     is(cycle2) {
       // cycle2: perform push or pop operation
@@ -88,12 +87,28 @@ class RPU(val level: Int) extends Module {
       lc_block := io.lc_node_value_in
       rc_block := io.rc_node_value_in
 
-      // 2.2: perform push or pop operation
-      when(!token_block.operation.pop || token_block.value.existing) {
+      when(token_block.operation.pop) {
+        // 2.2.1: perform pop operation
+        when(!lc_block.entry.existing && !rc_block.entry.existing) { // if both B[left(i)] and B[right(i)] are inactive
+          next_B_block.entry := Entry.default // return done
+
+          next_token_block.operation := Operator.nop
+          next_token_block.value := DontCare
+          next_token_block.position := DontCare
+        }.otherwise {
+          val deq_cmp = lc_block.entry < rc_block.entry // determine the node B[k] with the largest value v;
+          next_B_block.entry := Mux(deq_cmp, lc_block.entry, rc_block.entry) // B[i].value <= v;
+
+          next_token_block.operation := token_block.operation // return not done
+          next_token_block.value := token_block.value
+          next_token_block.position := Mux(deq_cmp, lc_pos, rc_pos) // T[j+1].position <= k
+        }
+
+        next_B_block.capacity := B_block.capacity + 1.U // increment B[j].capacity
+
+      }.otherwise {
         // 2.2.1: perform push operation
         val v = token_block.value
-
-        printf(p"[cycle2] level=$level, token.pos=${token_block.position}, token.value.rank=${token_block.value.rank}, lc=$lc_pos, rc=$rc_pos\n")
 
         when(!B_block.entry.existing) {
           next_B_block.entry := v // if B[i].active = false: B[i].value <= v; B[i].active = true;
@@ -113,26 +128,13 @@ class RPU(val level: Int) extends Module {
           next_token_block.position := Mux(enq_cmp_T, lc_pos, rc_pos)       // else: T[j+1].position <= right(i)
         }
 
-        next_B_block.capacity := B_block.capacity - 1.U // decrement B[j].capacity
+        next_B_block.capacity := Mux(B_block.capacity > 0.U, B_block.capacity - 1.U, 0.U)  // decrement B[j].capacity
 
-      }.elsewhen(token_block.operation.pop) {
-        // 2.2.2: perform pop operation
-        when(!lc_block.entry.existing && !rc_block.entry.existing) { // if both B[left(i)] and B[right(i)] are inactive
-          next_B_block.entry := Entry.default // return done
-
-          next_token_block.operation := Operator.nop
-          next_token_block.value := DontCare
-          next_token_block.position := DontCare
-        }.otherwise {
-          val deq_cmp = lc_block.entry < rc_block.entry // determine the node B[k] with the largest value v;
-          next_B_block.entry := Mux(deq_cmp, lc_block.entry, rc_block.entry) // B[i].value <= v;
-
-          next_token_block.operation := token_block.operation // return not done
-          next_token_block.value := DontCare
-          next_token_block.position := Mux(deq_cmp, lc_pos, rc_pos) // T[j+1].position <= k
-        }
-        next_B_block.capacity := B_block.capacity + 1.U // increment B[j].capacity
       }
+
+      printf(p"[cycle2] level=$level, operation=${token_block.operation.pop} ,token.pos=${token_block.position}, token.value.rank=${token_block.value.rank}\n")
+      printf(p"[cycle2] lc.capacity=${lc_block.capacity},lc.pos=${lc_pos} lc.value=${lc_block.entry.rank}, rc.pos=${rc_pos}, rc.value=${rc_block.entry.rank}\n")
+      if(level == 1) printf("===============================================================================================================================\n")
 
       // 2.3: update the cycle state
       cycle_state := cycle3
@@ -145,6 +147,7 @@ class RPU(val level: Int) extends Module {
         io.this_node_value_out := next_B_block
         io.token_out := next_token_block
       }
+      // 3.2: update the cycle state
       cycle_state := cycle1
     }
   }
