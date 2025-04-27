@@ -27,10 +27,10 @@ object Param {
 
     def is_left(pos: UInt): Bool = pos % 2.U === 0.U
                 
-    def get_lc_pos(level: Int, pos: UInt): UInt = 2.U * pos
+    def get_lc_pos(parent_pos: UInt): UInt = 2.U * parent_pos
 
-    def get_rc_pos(level: Int, pos: UInt): UInt = 2.U * pos + 1.U
+    def get_rc_pos(parent_pos: UInt): UInt = 2.U * parent_pos + 1.U
 
-    val use_sram_param = true
+    val use_sram_param = false
 
 }

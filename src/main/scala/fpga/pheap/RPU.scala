@@ -22,54 +22,49 @@ class RPU(val level: Int) extends Module {
         val left_node_out = Output(new Node(level))
         val right_node_out = Output(new Node(level))
     })
-    // TODO memory每次读写2个节点
     // mem初始化需要get_pair_depth个周期，写入空pair
     val mem = Module(new Memory(level))
 
-    val token = RegInit(TokenNode.init(level))
-
-    token := io.token_in
+    // val token = RegInit(TokenNode.init(level))
+    val token = RegInit(io.token_in)
+    
+    // token_out只在cycle1状态进行输出，其他状态不输出
+    // 也就是说，除了level1,其他level的token_in信号都只能在idle状态下接收到
+    // 在下一个状态，token_in信号将变成无效值
     io.token_out := TokenNode.init(level)
 
-    // val addr = io.token_in.position
-    val addr = pos2addr(level, io.token_in.position)
-    val lc_pos = get_lc_pos(level, io.token_in.position)
-    val rc_pos = lc_pos + 1.U
-    val left_node = Wire(new Node(level))
-    val right_node = Wire(new Node(level))
-    val left_pos = get_lc_pos(level - 1, io.parent_pos_in)
-    val cur_node = Mux(left_pos === io.token_in.position, left_node, right_node)
+    val addr = pos2addr(level, token.position)
+    val lc_pos = RegInit(get_lc_pos(io.token_in.position))
+    val rc_pos = RegInit(get_rc_pos(io.token_in.position))
+    val left_node = RegInit(Node.default(level))
+    val right_node = RegInit(Node.default(level))
+    val left_pos = get_lc_pos(io.parent_pos_in)
+    val cur_node = Mux(left_pos === token.position, left_node, right_node)
     val new_pair = Wire(new Pair(level))
     val new_node = Wire(new Node(level))
 
     // 初始化
-    left_node := Node.default(level)
-    right_node := Node.default(level)
     new_pair := Pair.default(level)
     new_node := Node.default(level)
     idle()
 
-    io.cur_pos_out := io.token_in.position
+    io.cur_pos_out := token.position
     io.left_node_out := left_node
     io.right_node_out := right_node
     
-    val cmp_token_lc = io.token_in.entry < io.lc_node_in.entry
-    val cmp_token_rc = io.token_in.entry < io.rc_node_in.entry
+    val cmp_token_lc = token.op.push < io.lc_node_in.entry
+    val cmp_token_rc = token.op.push < io.rc_node_in.entry
     val cmp_lc_rc = io.lc_node_in.entry < io.rc_node_in.entry
 
     def local_enqueue() = {
         val cur_capacity = cur_node.capacity - 1.U
         when (!cur_node.entry.existing) {
-            // memory.write(addr, Node.init(level, io.token_in.entry, cur_capacity))
-            new_node := Node.init(level, io.token_in.entry, cur_capacity)
+            new_node := Node.init(level, token.op.push, cur_capacity)
             token.op := Operator.nop
-        } .elsewhen (cur_node.entry < io.token_in.entry) {
-            // memory.write(addr, Node.init(level, io.token_in.entry, cur_capacity))
-            new_node := Node.init(level, io.token_in.entry, cur_capacity)
-            token.entry := cur_node.entry
+        } .elsewhen (cur_node.entry < token.op.push) {
+            new_node := Node.init(level, token.op.push, cur_capacity)
+            token.op.push := cur_node.entry
         } .otherwise {
-            // 论文里没提到,但是应该要cur_node.capacity - 1.U吧?
-            // memory.write(addr, Node.init(level, cur_node.entry, cur_capacity))
             new_node := Node.init(level, cur_node.entry, cur_capacity)
         }
         token.position := Mux(io.lc_node_in.capacity > 0.U, lc_pos, rc_pos)
@@ -80,16 +75,13 @@ class RPU(val level: Int) extends Module {
         // 这里实现的是仅增加当前层Node的capacity
         val cur_capacity = cur_node.capacity + 1.U
         when (!io.lc_node_in.entry.existing && !io.rc_node_in.entry.existing) {
-            // memory.write(addr, Node.init(level, Entry.default, cur_capacity))
             new_node := Node.init(level, Entry.default, cur_capacity)
             token.op := Operator.nop
         } .otherwise {
             when(io.lc_node_in.entry < io.rc_node_in.entry) {
-                // memory.write(addr, Node.init(level, io.rc_node_in.entry, cur_capacity))  
                 new_node := Node.init(level, io.rc_node_in.entry, cur_capacity)     
                 token.position := rc_pos
             } .otherwise {
-                // memory.write(addr, Node.init(level, io.lc_node_in.entry, cur_capacity))   
                 new_node := Node.init(level, io.lc_node_in.entry, cur_capacity)    
                 token.position := lc_pos
             }
@@ -102,43 +94,52 @@ class RPU(val level: Int) extends Module {
             // 三角形中包括token, lc_node, rc_node
             // 因为在根节点cur_node与V比较完之后,并不能在外部马上将结果写入
             // 所以只能先用token将比较结果传进RPU
-            // memory.write(addr, Node.init(level, io.token_in.entry, get_capacity(level) - 1.U) )
-            new_node := Node.init(level, io.token_in.entry, get_capacity(level) - 1.U)
+            new_node := Node.init(level, token.op.push, get_capacity(level) - 1.U)
             token.op := Operator.nop
         } .otherwise {
             when (!cmp_token_lc && !cmp_token_rc) {
-                // memory.write(addr, Node.init(level, io.token_in.entry, get_capacity(level) - 1.U) )
-                new_node := Node.init(level, io.token_in.entry, get_capacity(level) - 1.U)
+                new_node := Node.init(level, token.op.push, get_capacity(level) - 1.U)
                 token.op := Operator.nop
             } .otherwise {
-                // memory.write(addr, Mux(cmp_lc_rc, io.rc_node_in, io.lc_node_in))
                 new_node := Mux(cmp_lc_rc, io.rc_node_in, io.lc_node_in)
-                token.entry := cur_node.entry
+                token.op.push := cur_node.entry
                 token.position := Mux(cmp_lc_rc, rc_pos, lc_pos)
             }
         }
     }
 
     // 保证操作完成后再将token向下传递
-    val sCycle0 :: sCycle1 :: sCycle2 :: sIdle :: Nil = Enum(4)
+    val sCycle0 :: sCycle1 :: sIdle :: Nil = Enum(3)
     val state = RegInit(sIdle)
 
     // idle -> cycle0 接收到token，根据token读
     // cycle0 -> cycle1 读到结果，根据结果写，并更新token
-    // cycle1 -> cycle2 token传到下一级，mem.idle
+    // cycle1 -> idle token传到下一级，mem.idle
+    // TODO 如果在cycle1阶段将token传到下一级，那么在下一个周期
+    //      当前rpu处于idle状态，下一级rpu处于cycle0状态
+    val pass_down = RegInit(false.B)
     switch(state) {
         is(sIdle) {
             when(io.token_in.op.pop || io.token_in.op.push.existing) {
-                state := sCycle0
+                token := io.token_in
+                lc_pos := get_lc_pos(io.token_in.position)
+                rc_pos := get_rc_pos(io.token_in.position)
                 val pair = read(addr)
+                // TODO 为什么读出的空节点capacity为0？
                 left_node := pair.first
                 right_node := pair.second
+                state := sCycle0
             }
-            io.token_out := TokenNode.init(level) 
+            when (pass_down) {
+                io.token_out := token
+                pass_down := false.B
+            } .otherwise {
+                io.token_out := TokenNode.init(level) 
+            }
         }
         is(sCycle0) {
-            io.token_out := TokenNode.init(level) 
-            when(is_left(io.token_in.position)) {
+            // io.token_out := TokenNode.init(level) 
+            when(is_left(token.position)) {
                 new_pair.first := new_node
                 new_pair.second := right_node
             }.otherwise {
@@ -146,30 +147,24 @@ class RPU(val level: Int) extends Module {
                 new_pair.second := new_node
             }
             write(addr, new_pair)
+            when (token.op.pop) {
+                when(token.op.push.existing) {
+                    local_enqueue_dequeue()
+                } .otherwise {
+                    local_dequeue()
+                }
+            } .otherwise {
+                local_enqueue()
+            }
             state := sCycle1
         }
         is(sCycle1) {
-            io.token_out := TokenNode.init(level) 
+            pass_down := true.B
             idle()
-            state := sCycle2
-        }
-        is(sCycle2) {
-            io.token_out := token  
-            idle()          
-            state := sIdle                   
+            state := sIdle
         }
     }
 
-
-    when (io.token_in.op.pop) {
-        when(io.token_in.op.push.existing) {
-            local_dequeue()
-        } .otherwise {
-            local_enqueue_dequeue()
-        }
-    } .otherwise {
-        local_enqueue()
-    }
 
     def ~>(next: RPU) = {
         next.io.token_in := RegNext(this.io.token_out)

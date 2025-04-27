@@ -28,18 +28,13 @@ class Memory(
     private val mem = if (use_sram) Module(new SinglePortSram(depth, width))
                       else          Module(new SinglePortFFMem(depth, width))
 
-    // === 1) 在 Scala 端把默认值打平成 VecInit[UInt] ===
-    private val init_vec = VecInit(
-        (0 until depth).map(i => Pair.default(i).asUInt)
-    )
-
-    // === 2) init_memory() 返回的 done 信号 ===
+    // === 1) init_memory() 返回的 done 信号 ===
     private val init_done = init_memory()
     io.init_done_out := init_done
 
-    // === 3) 正常读写，等 init_done_out 后才打开 ===
+    // === 2) 正常读写，等 init_done_out 后才打开 ===
     mem.idle()
-    io.pair_out := DontCare
+    io.pair_out := Pair.default(level)
     when (init_done && io.en) {
         when (io.wen) {
             mem.write(io.addr, io.pair_in.asUInt)
@@ -50,7 +45,7 @@ class Memory(
 
     /** 
      * 硬件化 init-memory： 
-     * 用一个计数器 cnt 从 0 到 depth-1，每拍写入 init_vec(cnt)
+     * 用一个计数器 cnt 从 0 到 depth-1，每拍写入 Pair.default(level).asUInt
      * 完成后拉高 done
      */
     private def init_memory(): Bool = {
@@ -59,7 +54,8 @@ class Memory(
 
         when (!done) {
             // 按照 cnt 从 init_vec 中读取常量，写到 mem 中
-            mem.write(cnt, init_vec(cnt))
+            mem.write(cnt, Pair.default(level).asUInt)
+            // printf(p"Writing level=$level, cnt=$cnt, capacity=${Pair.default(level).first.capacity}\n")
             cnt := cnt + 1.U
             when (cnt === (depth-1).U) {
                 done := true.B

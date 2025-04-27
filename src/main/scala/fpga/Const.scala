@@ -11,7 +11,7 @@ object Const {
     val metadata_width = 32
 
     // the width of the rank
-    val rank_width = 16
+    val rank_width = 8
 
     val debug = false
 

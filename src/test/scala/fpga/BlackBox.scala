@@ -17,7 +17,7 @@ object BlackBox {
     val num_ops = 100
 
     // push, pop, replace ratio
-    val ratio = (0.3, 0.3, 0.4)
+    val ratio = (0.7, 0.3, 0)
     val op_nop = -1
     val op_push = 0
     val op_pop = 1
@@ -53,7 +53,7 @@ object BlackBox {
         pq.io.op_in.push.rank.poke(rank.U)
         pq.io.op_in.push.metadata.poke(metadata.U)
         pq.io.op_in.pop.poke(false.B)
-        pq.clock.step()
+        pq.clock.step(3)
         std_pq.enqueue((rank, metadata))
         if(debug) debug_print(s"push(${rank})")
     }
@@ -64,7 +64,7 @@ object BlackBox {
         pq.io.op_in.push.rank.poke(-1.S(rank_width.W).asUInt)
         pq.io.op_in.push.metadata.poke(0.U)
         pq.io.op_in.pop.poke(true.B)
-        pq.clock.step()
+        pq.clock.step(3)
         std_pq.dequeue()
         if(debug) debug_print("pop")
     }
@@ -118,11 +118,14 @@ object BlackBox {
         val test_nums = Array.fill(num_ops)(random.nextInt(1 << rank_width))
 
         // the built-in priority queue to check the result, and the priority queue to test
-        lazy implicit val std_pq = new PriorityQueue[(Int, Int)]()(Ordering.by((x: (Int, Int)) => (x._1, x._2)).reverse)
+        // lazy implicit val std_pq = new PriorityQueue[(Int, Int)]()(Ordering.by((x: (Int, Int)) => (x._1, x._2)).reverse)
+        // PHeap的优先级与前面的几个结构相反
+        lazy implicit val std_pq = new PriorityQueue[(Int, Int)]()(Ordering.by((x: (Int, Int)) => (x._1, x._2)))
         lazy implicit val pq = c
 
         // TODO 给时间完成初始化
         pq.clock.step(4)
+
 
         // initialize the priority queue
         cold_start_nums.zipWithIndex.foreach { case (rank, metadata) =>
