@@ -65,14 +65,14 @@ class PHeap extends Module {
 
   this_bnode_read_ports(last_num).en := last_rpu.io.this_node_read_en
   this_bnode_read_ports(last_num).addr := last_rpu.io.this_node_pos_out
-  last_rpu.io.this_node_value_in := this_bnode_read_ports(last_num).data
+  last_rpu.io.this_node_value_in := RegNext(this_bnode_read_ports(last_num).data)
 
   this_bnode_write_ports(last_num).en := last_rpu.io.this_node_write_en
   this_bnode_write_ports(last_num).addr := last_rpu.io.this_node_pos_out
   this_bnode_write_ports(last_num).data := last_rpu.io.this_node_value_out
 
-  last_rpu.io.lc_node_value_in := BNode.last
-  last_rpu.io.rc_node_value_in := BNode.last
+  last_rpu.io.lc_node_value_in := RegNext(BNode.last)
+  last_rpu.io.rc_node_value_in := RegNext(BNode.last)
 
   // initialize the first layer rwport
   lc_bnode_read_ports(0).en := false.B

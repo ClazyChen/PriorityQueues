@@ -33,7 +33,7 @@ object BNode {
   def last: BNode = {
     val bnode = Wire(new BNode(count_of_levels))
     bnode.entry := Entry.default
-    bnode.capacity := 0.U
+    bnode.capacity := 1.U
     bnode
   }
 }

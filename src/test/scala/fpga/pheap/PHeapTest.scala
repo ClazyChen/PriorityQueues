@@ -74,19 +74,20 @@ class PHeapTest extends AnyFreeSpec with ChiselScalatestTester {
 
       for((rank, metadata) <- testData) {
         enqueue(dut, rank.U, metadata.U)
-        nop(dut)
+        nop(dut, 12)
+        printPHeap(dut)
       }
+
+      dequeue(dut)
+      nop(dut, 12)
       printPHeap(dut)
 
       dequeue(dut)
-      nop(dut)
+      nop(dut, 12)
       printPHeap(dut)
 
       dequeue(dut)
-      nop(dut)
-      printPHeap(dut)
-
-      nop(dut, 9)
+      nop(dut, 12)
       printPHeap(dut)
     }
   }

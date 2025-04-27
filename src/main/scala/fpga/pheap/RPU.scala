@@ -90,14 +90,14 @@ class RPU (val level: Int) extends Module {
       lc_block := io.lc_node_value_in
       rc_block := io.rc_node_value_in
 
-      when(token_block.operation.pop) {
+      when(token_block.operation.pop  && !token_block.value.existing) {
         // 2.2.1: perform pop operation
         // 2.2.1.1: if both B[left(i)] and B[right(i)] are inactive
         when(!lc_block.entry.existing && !rc_block.entry.existing) {
           next_B_block.entry := Entry.default   // return done
 
           next_token_block.operation := Operator.nop
-          next_token_block.value := Entry.default
+          next_token_block.value := DontCare
           next_token_block.position := DontCare
         }.otherwise {
           // 2.2.1.2: B[left(i)].existing || B[right(i)].existing == true
@@ -136,6 +136,7 @@ class RPU (val level: Int) extends Module {
         }
 
         next_B_block.capacity := B_block.capacity - 1.U
+
       }
 
 //      printf("===================================================================================\n")
