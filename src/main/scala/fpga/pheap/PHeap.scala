@@ -1,7 +1,6 @@
 package fpga.pheap
 
 import chisel3._
-import chisel3.util._
 import fpga._
 import fpga.pheap.Const._
 

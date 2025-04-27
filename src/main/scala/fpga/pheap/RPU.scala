@@ -117,14 +117,16 @@ class RPU (val level: Int) extends Module {
         val v = token_block.value
 
         when(!B_block.entry.existing) {
-          next_B_block.entry := v    // if B[i].active = false: B[i].value <= v; B[i].active = true;
+          // 2.2.2.1: if B[i].active = false: B[i].value <= v; B[i].active = true;
+          next_B_block.entry := v
 
           next_token_block.operation := Operator.nop    // return done
           next_token_block.value := DontCare
           next_token_block.position := DontCare
 
         }.otherwise {
-          val (next_B_entry, next_T_entry) = B_block.entry.minmax(v) // elsif: T[j].value < B[i].value: swap T[j].value, B[i].value
+          // 2.2.2.2: elsif: T[j].value < B[i].value: swap T[j].value, B[i].value
+          val (next_B_entry, next_T_entry) = B_block.entry.minmax(v)
 
           next_B_block.entry := next_B_entry
 
@@ -138,7 +140,7 @@ class RPU (val level: Int) extends Module {
         next_B_block.capacity := B_block.capacity - 1.U
 
       }
-
+//      // Test Block:
 //      printf("===================================================================================\n")
 //      printf(p"level=$level, operation=${token_block.operation.pop}, token_pos=${token_block.position}\n")
 //      printf(p"token_value=${token_block.value.rank}, B_block_value=${B_block.entry.rank}, B_block_capacity=${B_block.capacity}\n")
