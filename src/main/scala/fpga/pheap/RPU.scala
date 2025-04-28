@@ -63,9 +63,11 @@ class RPU (val level: Int) extends Module {
       token_block := io.token_in
       // 1.1: perform operation when the operator is not nop
       when(io.token_in.operation.pop || io.token_in.value.existing) {
+        // 1.1.1: access this BNode
         io.this_node_read_en := true.B
         io.this_node_pos_out := io.token_in.position - 1.U
 
+        // 1.1.2: access lc BNode and rc BNode
         val this_lc_pos = TreeIndexing.get_lc_pos(level, io.token_in.position)
         val this_rc_pos = TreeIndexing.get_rc_pos(level, io.token_in.position)
 
@@ -78,9 +80,8 @@ class RPU (val level: Int) extends Module {
         io.rc_node_read_en := true.B
         io.rc_node_pos_out := this_rc_pos - 1.U
 
-        // 1.1: update the cycle state
+        // 1.2: update the cycle state
         cycle_state := cycle2
-
       }
     }
     is(cycle2) {
@@ -91,7 +92,7 @@ class RPU (val level: Int) extends Module {
       rc_block := io.rc_node_value_in
 
       when(token_block.operation.pop  && !token_block.value.existing) {
-        // 2.2.1: perform pop operation
+        // 2.2.1: perform dequeue operation
         // 2.2.1.1: if both B[left(i)] and B[right(i)] are inactive
         when(!lc_block.entry.existing && !rc_block.entry.existing) {
           next_B_block.entry := Entry.default   // return done
@@ -101,7 +102,7 @@ class RPU (val level: Int) extends Module {
           next_token_block.position := DontCare
         }.otherwise {
           // 2.2.1.2: B[left(i)].existing || B[right(i)].existing == true
-          val cmp = lc_block.entry < rc_block.entry   // determine the node B[k] with the largest value v;
+          val cmp = lc_block.entry < rc_block.entry   // determine the node B[k] with the smallest value v;
           next_B_block.entry := Mux(cmp, lc_block.entry, rc_block.entry)    // B[i].value <= v;
 
           next_token_block.operation := token_block.operation     // return not done
@@ -109,11 +110,11 @@ class RPU (val level: Int) extends Module {
           next_token_block.position := Mux(cmp, lc_pos, rc_pos)   // T[j+1].position <= k
         }
 
-        // 2.2.1.3: increment B[j].capacity
+        // 2.2.2: increment B[j].capacity
         next_B_block.capacity := B_block.capacity + 1.U
 
       }.elsewhen(!token_block.operation.pop && token_block.value.existing) {
-        // 2.2.2: perform push operation
+        // 2.2.2: perform enqueue operation
         val v = token_block.value
 
         when(!B_block.entry.existing) {
@@ -136,10 +137,45 @@ class RPU (val level: Int) extends Module {
           next_token_block.value := next_T_entry // set T[j+1].value
           next_token_block.position := Mux(cmp, lc_pos, rc_pos) // else: T[j+1].position <= right(i)
         }
-
+        // 2.2.2.3: decrement B[j].capacity
         next_B_block.capacity := B_block.capacity - 1.U
 
+      }.elsewhen(token_block.operation.pop && token_block.value.existing) {
+        // TODO: 2.2.3: perform enqueue-dequeue operation
+        // 2.2.3.1: if both B[left(i)] and B[right(i)] are inactive
+        when(!lc_block.entry.existing && !rc_block.entry.existing) {
+          next_B_block.entry := token_block.value
+
+          next_token_block.operation := Operator.nop        // return done
+          next_token_block.value := DontCare
+          next_token_block.position := DontCare
+        }.otherwise {
+          // Read the values of the active nodes among all three nodes
+          // Determine the node B[k] with smallest value;
+          val child_cmp = lc_block.entry < rc_block.entry
+          val child_pos = Mux(child_cmp, lc_pos, rc_pos)
+          val child_entry = Mux(child_cmp, lc_block.entry, rc_block.entry)
+
+          val cmp = token_block.value < child_entry
+          when(cmp) {       // if i = k:
+            next_B_block.entry := token_block.value
+
+            next_token_block.operation := Operator.nop        // return done
+            next_token_block.value := DontCare
+            next_token_block.position := DontCare
+
+            next_B_block.capacity := B_block.capacity
+          }.otherwise {     // else if:
+            next_B_block.entry := child_entry         // Swap B[i].value, B[k].value;
+
+            next_token_block.operation := token_block.operation   // return not done;
+            next_token_block.value := token_block.value           // T[j+1].position <= k
+            next_token_block.position := child_pos
+          }
+        }
+        next_B_block.capacity := B_block.capacity
       }
+
 //      // Test Block:
 //      printf("===================================================================================\n")
 //      printf(p"level=$level, operation=${token_block.operation.pop}, token_pos=${token_block.position}\n")
@@ -148,7 +184,7 @@ class RPU (val level: Int) extends Module {
 //      printf(p"rc_pos=${rc_pos}, rc_capacity=${rc_block.capacity}, rc_value=${rc_block.entry.rank}\n")
 //      printf("===================================================================================\n")
 
-      // 2.2.3: update the cycle state
+      // 2.3: update the cycle state
       cycle_state := cycle3
 
     }
@@ -164,7 +200,6 @@ class RPU (val level: Int) extends Module {
 
       // 3.2: update the cycle state
       cycle_state := cycle1
-
     }
   }
 }

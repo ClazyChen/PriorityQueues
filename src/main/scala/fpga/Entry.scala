@@ -20,15 +20,9 @@ class Entry extends Bundle {
         val replace = this < that
         (Mux(replace, this, that), Mux(replace, that, this))
     }
+
 }
 
-object entry_ops {
-    def swap(cmp: Bool, this_entry: Entry, that_entry: Entry): (Entry, Entry) = {
-        val pre_entry = Mux(cmp, that_entry, this_entry)
-        val next_entry = Mux(cmp, this_entry, that_entry)
-        (pre_entry, next_entry)
-    }
-}
 
 // the default entry (invalid entry)
 object Entry {
