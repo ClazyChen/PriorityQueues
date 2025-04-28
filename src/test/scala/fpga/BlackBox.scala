@@ -124,7 +124,7 @@ object BlackBox {
         lazy implicit val pq = c
 
         // TODO 给时间完成初始化
-        pq.clock.step(4)
+        pq.clock.step(100)
 
 
         // initialize the priority queue

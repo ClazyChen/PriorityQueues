@@ -36,8 +36,10 @@ class RPU(val level: Int) extends Module {
     val addr = pos2addr(level, token.position)
     val lc_pos = RegInit(get_lc_pos(io.token_in.position))
     val rc_pos = RegInit(get_rc_pos(io.token_in.position))
-    val left_node = RegInit(Node.default(level))
-    val right_node = RegInit(Node.default(level))
+    // val left_node = RegInit(Node.default(level))
+    // val right_node = RegInit(Node.default(level))
+    val left_node = Wire(new Node(level))
+    val right_node = Wire(new Node(level))
     val left_pos = get_lc_pos(io.parent_pos_in)
     val cur_node = Mux(left_pos === token.position, left_node, right_node)
     val new_pair = Wire(new Pair(level))
@@ -48,6 +50,8 @@ class RPU(val level: Int) extends Module {
     new_node := Node.default(level)
     idle()
 
+    left_node := mem.io.pair_out.first
+    right_node := mem.io.pair_out.second
     io.cur_pos_out := token.position
     io.left_node_out := left_node
     io.right_node_out := right_node
@@ -115,8 +119,8 @@ class RPU(val level: Int) extends Module {
     // idle -> cycle0 接收到token，根据token读
     // cycle0 -> cycle1 读到结果，根据结果写，并更新token
     // cycle1 -> idle token传到下一级，mem.idle
-    // TODO 如果在cycle1阶段将token传到下一级，那么在下一个周期
-    //      当前rpu处于idle状态，下一级rpu处于cycle0状态
+    // 如果在cycle1阶段将token传到下一级，那么在下一个周期
+    // 当前rpu处于idle状态，下一级rpu处于cycle0状态
     val pass_down = RegInit(false.B)
     switch(state) {
         is(sIdle) {
@@ -124,10 +128,11 @@ class RPU(val level: Int) extends Module {
                 token := io.token_in
                 lc_pos := get_lc_pos(io.token_in.position)
                 rc_pos := get_rc_pos(io.token_in.position)
-                val pair = read(addr)
-                // TODO 为什么读出的空节点capacity为0？
-                left_node := pair.first
-                right_node := pair.second
+                // val pair = read(addr)
+                // // TODO 为什么读出的空节点capacity为0？
+                // left_node := pair.first
+                // right_node := pair.second
+                read(addr)
                 state := sCycle0
             }
             when (pass_down) {
@@ -138,15 +143,6 @@ class RPU(val level: Int) extends Module {
             }
         }
         is(sCycle0) {
-            // io.token_out := TokenNode.init(level) 
-            when(is_left(token.position)) {
-                new_pair.first := new_node
-                new_pair.second := right_node
-            }.otherwise {
-                new_pair.first := left_node
-                new_pair.second := new_node
-            }
-            write(addr, new_pair)
             when (token.op.pop) {
                 when(token.op.push.existing) {
                     local_enqueue_dequeue()
@@ -156,6 +152,14 @@ class RPU(val level: Int) extends Module {
             } .otherwise {
                 local_enqueue()
             }
+            when(is_left(token.position)) {
+                new_pair.first := new_node
+                new_pair.second := right_node
+            }.otherwise {
+                new_pair.first := left_node
+                new_pair.second := new_node
+            }
+            write(addr, new_pair)
             state := sCycle1
         }
         is(sCycle1) {
@@ -177,7 +181,7 @@ class RPU(val level: Int) extends Module {
         mem.io.en := true.B
         mem.io.wen := false.B
         mem.io.addr := addr
-        mem.io.pair_in := DontCare
+        mem.io.pair_in := Pair.default(level)
         mem.io.pair_out
     }
 
@@ -192,6 +196,7 @@ class RPU(val level: Int) extends Module {
         mem.io.en := false.B
         mem.io.wen := DontCare
         mem.io.addr := DontCare
-        mem.io.pair_in := DontCare
+        mem.io.pair_in := Pair.default(level)
     }
+
 }

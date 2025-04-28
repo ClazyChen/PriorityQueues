@@ -31,6 +31,6 @@ object Param {
 
     def get_rc_pos(parent_pos: UInt): UInt = 2.U * parent_pos + 1.U
 
-    val use_sram_param = false
+    val use_sram_param = true
 
 }

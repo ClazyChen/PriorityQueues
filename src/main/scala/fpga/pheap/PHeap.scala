@@ -10,7 +10,6 @@ import fpga.pheap.Param._
 
 class PHeap extends Module with PriorityQueueTrait {
     val io = IO(new PQIO)
-    
 
     val rpus = Seq.tabulate(count_of_levels + 1) { level =>
         val level_module = Module(new RPU(level))

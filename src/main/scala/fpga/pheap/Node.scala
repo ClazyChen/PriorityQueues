@@ -28,6 +28,13 @@ object Node {
         node
     }
 
+    def test(level : Int): Node = {
+        val node       = Wire(new Node(level))
+        node.entry    := Entry.default
+        node.capacity := -1.S(capacity_width(level).W).asUInt - 1.U
+        node
+    }
+
     def getWidth(level : Int): Int = (new Node(level)).getWidth
 
 }
@@ -42,6 +49,13 @@ object Pair {
         val pair = Wire(new Pair(level))
         pair.first  := Node.default(level)
         pair.second := Node.default(level)
+        pair
+    }
+
+    def test(level: Int): Pair = {
+        val pair = Wire(new Pair(level))
+        pair.first  := Node.test(level)
+        pair.second := Node.test(level)
         pair
     }
 }
