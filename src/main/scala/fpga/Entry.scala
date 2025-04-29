@@ -56,7 +56,6 @@ trait PriorityQueueTrait extends Module {
         val op_in = Input(new Operator)
         val entry_out = Output(new Entry)
     }
-
     val io: PQIO
 }
 

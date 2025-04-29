@@ -161,7 +161,7 @@ class RPU (val level: Int) extends Module {
             next_B_block.entry := token_block.value
 
             next_token_block.operation := Operator.nop        // return done
-            next_token_block.value := DontCare
+            next_token_block.value := Entry.default
             next_token_block.position := DontCare
 
             next_B_block.capacity := B_block.capacity
