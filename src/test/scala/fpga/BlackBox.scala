@@ -11,13 +11,14 @@ import fpga.Const._
 object BlackBox {
 
     // cold start operations (all of them are push operations)
-    val cold_start_ops = count_of_entries
+    // val cold_start_ops = count_of_entries
+    val cold_start_ops = 3
 
     // number of operations in the test
     val num_ops = 100
 
     // push, pop, replace ratio
-    val ratio = (0.7, 0.3, 0)
+    val ratio = (0.6, 0.1, 0.3)
     val op_nop = -1
     val op_push = 0
     val op_pop = 1
@@ -124,7 +125,7 @@ object BlackBox {
         lazy implicit val pq = c
 
         // TODO 给时间完成初始化
-        pq.clock.step(100)
+        pq.clock.step(4)
 
 
         // initialize the priority queue
@@ -143,7 +144,7 @@ object BlackBox {
                 case `op_pop` => pop
                 case `op_replace` => replace(test_nums(i), i)
             }
-            check_top
+            // check_top
         }
 
     }

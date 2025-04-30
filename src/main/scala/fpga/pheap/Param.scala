@@ -11,7 +11,7 @@ object Param {
 
     val count_of_levels = get_level()
 
-    def get_capacity(level: Int): UInt = ((1 << (count_of_levels + 1 - level)) - 1).U
+    def get_capacity(level: Int): UInt = (1 << (count_of_levels + 1 - level)).U
 
     def capacity_width(level: Int) = count_of_levels + 1 - level
 
@@ -30,6 +30,9 @@ object Param {
     def get_lc_pos(parent_pos: UInt): UInt = 2.U * parent_pos
 
     def get_rc_pos(parent_pos: UInt): UInt = 2.U * parent_pos + 1.U
+
+    // 这里采用移码，1代表0
+    def is_empty_node(node: Node) = node.capacity === 1.U
 
     val use_sram_param = true
 

@@ -15,6 +15,9 @@ class Entry extends Bundle {
     // compare two entries by rank
     def <(that: Entry): Bool = (this.rank < that.rank) || !that.existing
 
+    // 用于pheap等，rank越大优先级越高
+    def >(that: Entry): Bool = (this.rank > that.rank) || !that.existing
+
     // return min and max of two entries
     def minmax(that: Entry): (Entry, Entry) = {
         val replace = this < that
