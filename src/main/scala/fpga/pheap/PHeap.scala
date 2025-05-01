@@ -12,6 +12,7 @@ class PHeap extends Module {
     val debug_B = Output(Vec(TreeIndexing.total_node_count, new BNode(count_of_levels)))
   })
 
+  // TODO: FFMem的使用
   val B = RegInit(VecInit.tabulate(TreeIndexing.total_node_count) { i=>
     val level = TreeIndexing.get_level_from_index(i)
     BNode.default(level)

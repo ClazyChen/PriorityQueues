@@ -1,12 +1,11 @@
-package fpga.pheap
+package fpga.pheaptest
 
 import chisel3._
 import chisel3.util._
 import fpga._
 import fpga.Entry
-import fpga.pheap.Const._
+import fpga.pheaptest.Const._
 
-// TODO: capacity宽度问题
 object capacity_width {
   def apply(level: Int): Int = {
     val max_capacity = count_of_levels - level + 1
@@ -56,13 +55,6 @@ object TNode {
     tnode
   }
 }
-
-/*
-      level1:               1                       B[0]
-      level2:           2       3               B[1]   B[2]
-      level3:       4     5   6     7        B[3]  B[4]
-                 8   9 10  11             B[7]
- */
 
 object TreeIndexing {
 

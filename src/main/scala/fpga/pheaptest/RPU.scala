@@ -1,9 +1,9 @@
-package fpga.pheap
+package fpga.pheaptest
 
 import chisel3._
 import chisel3.util._
 import fpga._
-import fpga.pheap.Const._
+import fpga.pheaptest.Const._
 
 class RPU (val level: Int) extends Module {
   val io = IO(new Bundle {
@@ -176,13 +176,13 @@ class RPU (val level: Int) extends Module {
         next_B_block.capacity := B_block.capacity
       }
 
-//      // Test Block:
-//      printf("===================================================================================\n")
-//      printf(p"level=$level, operation=${token_block.operation.pop}, token_pos=${token_block.position}\n")
-//      printf(p"token_value=${token_block.value.rank}, B_block_value=${B_block.entry.rank}, B_block_capacity=${B_block.capacity}\n")
-//      printf(p"lc_pos=${lc_pos}, lc_capacity=${lc_block.capacity}, lc_value=${lc_block.entry.rank}\n")
-//      printf(p"rc_pos=${rc_pos}, rc_capacity=${rc_block.capacity}, rc_value=${rc_block.entry.rank}\n")
-//      printf("===================================================================================\n")
+      //      // Test Block:
+      //      printf("===================================================================================\n")
+      //      printf(p"level=$level, operation=${token_block.operation.pop}, token_pos=${token_block.position}\n")
+      //      printf(p"token_value=${token_block.value.rank}, B_block_value=${B_block.entry.rank}, B_block_capacity=${B_block.capacity}\n")
+      //      printf(p"lc_pos=${lc_pos}, lc_capacity=${lc_block.capacity}, lc_value=${lc_block.entry.rank}\n")
+      //      printf(p"rc_pos=${rc_pos}, rc_capacity=${rc_block.capacity}, rc_value=${rc_block.entry.rank}\n")
+      //      printf("===================================================================================\n")
 
       // 2.3: update the cycle state
       cycle_state := cycle3
