@@ -1,24 +1,27 @@
 package fpga.pheap
 
 import chisel3._
+import chisel3.util._
 import fpga._
 import fpga.pheap.Const._
 
-class PHeap extends Module {
-  val io = IO(new Bundle {
-    val op_in = Input(new Operator)
-    val entry_out = Output(new Entry)
+class PHeap extends Module with PriorityQueueTrait {
+  val io = IO(new PQIO)
 
-    val debug_B = Output(Vec(TreeIndexing.total_node_count, new BNode(count_of_levels)))
-  })
-
-  // TODO: FFMem的使用
-  val B = RegInit(VecInit.tabulate(TreeIndexing.total_node_count) { i=>
-    val level = TreeIndexing.get_level_from_index(i)
-    BNode.default(level)
-  })
-
-  io.entry_out := B(0).entry
+  val left_levels: Seq[LevelMem] = Seq.tabulate(count_of_levels) { idx =>
+    val level = idx + 1
+    val data_width = 1 << idx
+    val node_width = WireDefault(BNode.default(level)).asUInt.getWidth
+    val heap_level  = Module(new LevelMem(data_width, node_width))
+    heap_level
+  }
+  val right_levels: Seq[LevelMem] = Seq.tabulate(count_of_levels) { idx =>
+    val level = idx + 1
+    val data_width = 1 << idx
+    val node_width = WireDefault(BNode.default(level)).asUInt.getWidth
+    val heap_level  = Module(new LevelMem(data_width, node_width))
+    heap_level
+  }
 
   val rpus = (1 to count_of_levels).map(level => Module(new RPU(level)))
 
@@ -26,79 +29,70 @@ class PHeap extends Module {
   rpus(0).io.token_in.position := 1.U
   rpus(0).io.token_in.value := io.op_in.push
 
+  io.entry_out := Entry.default
+
+  when(io.op_in.pop) {
+    left_levels(0).io.r.en := true.B
+    left_levels(0).io.r.addr := 0.U
+    io.entry_out := left_levels(0).io.r.data.asTypeOf(new BNode(0)).entry
+  }
+
   for(i <- 0 until count_of_levels - 1) {
     rpus(i+1).io.token_in := RegNext(rpus(i).io.token_out)
   }
 
-  def b_read_ports = (1 to count_of_levels).map(level => Wire(new BNode_read_port(level)))
-  def b_write_ports = (1 to count_of_levels).map(level => Wire(new BNode_write_port(level)))
-
-  val this_bnode_read_ports = b_read_ports
-  val lc_bnode_read_ports = b_read_ports
-  val rc_bnode_read_ports = b_read_ports
-  val this_bnode_write_ports = b_write_ports
-
   for(i <- 0 until count_of_levels - 1) {
+    val level = i+1
     val rpu = rpus(i)
 
     // connect read port and rpu
-    this_bnode_read_ports(i).en := rpu.io.this_node_read_en
-    this_bnode_read_ports(i).addr := rpu.io.this_node_pos_out
-    rpu.io.this_node_value_in := RegNext(this_bnode_read_ports(i).data)
+    left_levels(i).io.r.en := rpu.io.this_node_read_en
+    left_levels(i).io.r.addr := rpu.io.this_node_pos_out
+    rpu.io.this_node_value_in := RegNext(left_levels(i).io.r.data.asTypeOf(new BNode(level)))
 
-    this_bnode_write_ports(i).en := rpu.io.this_node_write_en
-    this_bnode_write_ports(i).addr := rpu.io.this_node_pos_out
-    this_bnode_write_ports(i).data := rpu.io.this_node_value_out
+    left_levels(i).io.w.en := rpu.io.this_node_write_en
+    left_levels(i).io.w.addr := rpu.io.this_node_pos_out
+    left_levels(i).io.w.data := rpu.io.this_node_value_out.asUInt
 
-    lc_bnode_read_ports(i+1).en := rpu.io.lc_node_read_en
-    lc_bnode_read_ports(i+1).addr := rpu.io.lc_node_pos_out
-    rpu.io.lc_node_value_in := RegNext(lc_bnode_read_ports(i+1).data)
+    right_levels(i).io.w.en := rpu.io.this_node_write_en
+    right_levels(i).io.w.addr := rpu.io.this_node_pos_out
+    right_levels(i).io.w.data := rpu.io.this_node_value_out.asUInt
 
-    rc_bnode_read_ports(i+1).en := rpu.io.rc_node_read_en
-    rc_bnode_read_ports(i+1).addr := rpu.io.rc_node_pos_out
-    rpu.io.rc_node_value_in := RegNext(rc_bnode_read_ports(i+1).data)
+    left_levels(i+1).io.r.en := rpu.io.lc_node_read_en
+    left_levels(i+1).io.r.addr := rpu.io.lc_node_pos_out
+    rpu.io.lc_node_value_in := RegNext(left_levels(i+1).io.r.data.asTypeOf(new BNode(level+1)))
+
+    right_levels(i+1).io.r.en := rpu.io.rc_node_read_en
+    right_levels(i+1).io.r.addr := rpu.io.rc_node_pos_out
+    rpu.io.rc_node_value_in := RegNext(right_levels(i+1).io.r.data.asTypeOf(new BNode(level+1)))
   }
+
+  right_levels(0).io.r.en := rpus(0).io.this_node_read_en
+  right_levels(0).io.r.addr := rpus(0).io.this_node_pos_out
+  rpus(0).io.this_node_value_in := RegNext(left_levels(0).io.r.data.asTypeOf(new BNode(1)))
 
   // initialize the last layer rpu
   val last_num = count_of_levels - 1
   val last_rpu = rpus.last
 
-  this_bnode_read_ports(last_num).en := last_rpu.io.this_node_read_en
-  this_bnode_read_ports(last_num).addr := last_rpu.io.this_node_pos_out
-  last_rpu.io.this_node_value_in := RegNext(this_bnode_read_ports(last_num).data)
+  // connect read port and rpu
+  left_levels(last_num).io.r.en := last_rpu.io.this_node_read_en
+  left_levels(last_num).io.r.addr := last_rpu.io.this_node_pos_out
+  last_rpu.io.this_node_value_in := RegNext(left_levels(last_num).io.r.data.asTypeOf(new BNode(last_num)))
 
-  this_bnode_write_ports(last_num).en := last_rpu.io.this_node_write_en
-  this_bnode_write_ports(last_num).addr := last_rpu.io.this_node_pos_out
-  this_bnode_write_ports(last_num).data := last_rpu.io.this_node_value_out
+  left_levels(last_num).io.w.en := last_rpu.io.this_node_write_en
+  left_levels(last_num).io.w.addr := last_rpu.io.this_node_pos_out
+  left_levels(last_num).io.w.data := last_rpu.io.this_node_value_out.asUInt
 
+  right_levels(last_num).io.w.en := last_rpu.io.this_node_write_en
+  right_levels(last_num).io.w.addr := last_rpu.io.this_node_pos_out
+  right_levels(last_num).io.w.data := last_rpu.io.this_node_value_out.asUInt
+
+  last_rpu.io.lc_node_read_en := DontCare
+  last_rpu.io.lc_node_pos_out := DontCare
   last_rpu.io.lc_node_value_in := RegNext(BNode.last)
+
+  last_rpu.io.rc_node_read_en := DontCare
+  last_rpu.io.rc_node_pos_out := DontCare
   last_rpu.io.rc_node_value_in := RegNext(BNode.last)
-
-  // initialize the first layer rwport
-  lc_bnode_read_ports(0).en := false.B
-  lc_bnode_read_ports(0).addr := DontCare
-
-  rc_bnode_read_ports(0).en := false.B
-  rc_bnode_read_ports(0).addr := DontCare
-
-  for(level <- 1 to count_of_levels) {
-    val idx = level - 1
-    connect_read_port(this_bnode_read_ports(idx), level)
-    connect_write_port(this_bnode_write_ports(idx), level)
-    connect_read_port(lc_bnode_read_ports(idx), level)
-    connect_read_port(rc_bnode_read_ports(idx), level)
-  }
-
-  def connect_read_port(read: BNode_read_port, level: Int): Unit = {
-    val base = TreeIndexing.level_start_index(level)
-    read.data := Mux(read.en, B(base.U + read.addr), BNode.default(level))
-  }
-  def connect_write_port(write: BNode_write_port, level: Int): Unit = {
-    val base = TreeIndexing.level_start_index(level)
-    when(write.en) {
-      B(base.U + write.addr) := write.data
-    }
-  }
-  io.debug_B := B
-
 }

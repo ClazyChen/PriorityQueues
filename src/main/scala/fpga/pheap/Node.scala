@@ -57,13 +57,6 @@ object TNode {
   }
 }
 
-/*
-      level1:               1                       B[0]
-      level2:           2       3               B[1]   B[2]
-      level3:       4     5   6     7        B[3]  B[4]
-                 8   9 10  11             B[7]
- */
-
 object TreeIndexing {
 
   // 总层数 -> 总节点数
@@ -89,17 +82,4 @@ object TreeIndexing {
 
   // 父节点层内索引 -> 右子节点层内索引
   def get_rc_pos(level: Int, offset: UInt): UInt = ((get_level_start_index(level) + offset - 1.U) * 2.U + 1.U) - get_level_start_index(level+1) + 1.U
-
-}
-
-class BNode_read_port(level: Int) extends Bundle {
-  val en = Input(Bool())
-  val addr = Input(UInt(count_of_levels.W))
-  val data = Output(new BNode(level))
-}
-
-class BNode_write_port(level: Int) extends Bundle {
-  val en = Input(Bool())
-  val addr = Input(UInt(count_of_levels.W))
-  val data = Input(new BNode(level))
 }

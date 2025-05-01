@@ -1,10 +1,10 @@
-package fpga.pheaptest
+package fpga.pheap_visualization
 
 import chisel3._
 import chisel3.util._
 import fpga._
 import fpga.Entry
-import fpga.pheaptest.Const._
+import fpga.pheap_visualization.Const._
 
 object capacity_width {
   def apply(level: Int): Int = {
@@ -55,6 +55,13 @@ object TNode {
     tnode
   }
 }
+
+/*
+      level1:               1                       B[0]
+      level2:           2       3               B[1]   B[2]
+      level3:       4     5   6     7        B[3]  B[4]
+                 8   9 10  11             B[7]
+ */
 
 object TreeIndexing {
 
