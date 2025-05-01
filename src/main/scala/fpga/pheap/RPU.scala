@@ -5,6 +5,7 @@ import chisel3.util._
 import fpga._
 import fpga.pheap.Const._
 
+// TODO: 接口数量待优化
 class RPU (val level: Int) extends Module {
   val io = IO(new Bundle {
     val token_in = Input(new TNode(level))

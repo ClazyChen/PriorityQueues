@@ -11,7 +11,9 @@ class Sram(val data_depth: Int, val data_width: Int) extends Module with DualPor
         val w = new WritePort(addr_width, data_width)
     })
     val mem = SyncReadMem(data_depth, UInt(data_width.W))
+
     io.r.data := DontCare
+
     // SRAM read has a one cycle delay
     when (io.r.en) {
         io.r.data := mem.read(io.r.addr)
