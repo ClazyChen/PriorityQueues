@@ -96,28 +96,28 @@ class PHeapTest extends AnyFreeSpec with ChiselScalatestTester {
       }
 
       println("======================================")
-      print(f"[pop\n]")
+      print(f"[pop]\n")
       println("======================================")
       dequeue(dut)
       nop(dut, 12)
       printPHeap(dut)
 
       println("======================================")
-      print(f"[pop\n")
+      print(f"[pop]\n")
       println("======================================")
       dequeue(dut)
       nop(dut, 12)
       printPHeap(dut)
 
       println("======================================")
-      print(f"[pop\n]")
+      print(f"[pop]\n")
       println("======================================")
       dequeue(dut)
       nop(dut, 12)
       printPHeap(dut)
 
       println("======================================")
-      print(f"[pop\n]")
+      print(f"[pop]\n")
       println("======================================")
       replace(dut, 11.U, 5.U)
       nop(dut, 12)

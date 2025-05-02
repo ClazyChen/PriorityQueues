@@ -5,41 +5,27 @@ import chisel3.util._
 import fpga._
 import fpga.pheap.Const._
 
-// TODO: 接口数量待优化
 class RPU (val level: Int) extends Module {
   val io = IO(new Bundle {
-    val token_in = Input(new TNode(level))
+    val token_in  = Input(new TNode(level))
     val token_out = Output(new TNode(level))
 
-    val this_node_pos_out = Output(UInt(level.W))
+    val node_read_en  = Output(Bool())
+    val node_write_en = Output(Bool())
+    val node_pos_out  = Output(UInt(level.W))
 
-    val this_node_read_en = Output(Bool())
-    val this_node_value_in = Input(new BNode(level))
-
-    val this_node_write_en = Output(new Bool())
-    val this_node_value_out = Output(new BNode(level))
-
-    val lc_node_read_en = Output(new Bool())
-    val lc_node_pos_out = Output(UInt((level+1).W))
-    val lc_node_value_in = Input(new BNode(level+1))
-
-    val rc_node_read_en = Output(new Bool())
-    val rc_node_pos_out = Output(UInt((level+1).W))
-    val rc_node_value_in = Input(new BNode(level+1))
+    val this_node_in = Input(new BNode(level))
+    val this_node_out = Output(new BNode(level))
+    val lc_node_in = Input(new BNode(level+1))
+    val rc_node_in = Input(new BNode(level+1))
   })
 
   // initialize the output value
   io.token_out := TNode.default(level)
-
-  io.this_node_read_en := false.B
-  io.this_node_write_en := false.B
-  io.this_node_pos_out := 0.U
-  io.this_node_value_out := BNode.default(level)
-
-  io.lc_node_read_en := false.B
-  io.lc_node_pos_out := 0.U
-  io.rc_node_read_en := false.B
-  io.rc_node_pos_out := 0.U
+  io.node_read_en  := false.B
+  io.node_write_en := false.B
+  io.node_pos_out  := 0.U
+  io.this_node_out := BNode.default(level)
 
   // initialize token block and BNode block in this layer
   val token_block = RegInit(TNode.default(level))
@@ -65,21 +51,12 @@ class RPU (val level: Int) extends Module {
       // 1.1: perform operation when the operator is not nop
       when(io.token_in.operation.pop || io.token_in.value.existing) {
         // 1.1.1: access this BNode
-        io.this_node_read_en := true.B
-        io.this_node_pos_out := io.token_in.position - 1.U
+        io.node_read_en := true.B
+        io.node_pos_out := io.token_in.position - 1.U
 
         // 1.1.2: access lc BNode and rc BNode
-        val this_lc_pos = TreeIndexing.get_lc_pos(level, io.token_in.position)
-        val this_rc_pos = TreeIndexing.get_rc_pos(level, io.token_in.position)
-
-        lc_pos := this_lc_pos
-        rc_pos := this_rc_pos
-
-        io.lc_node_read_en := true.B
-        io.lc_node_pos_out := this_lc_pos - 1.U
-
-        io.rc_node_read_en := true.B
-        io.rc_node_pos_out := this_rc_pos - 1.U
+        lc_pos := TreeIndexing.get_lc_pos(level, io.token_in.position)
+        rc_pos := TreeIndexing.get_rc_pos(level, io.token_in.position)
 
         // 1.2: update the cycle state
         cycle_state := cycle2
@@ -88,9 +65,9 @@ class RPU (val level: Int) extends Module {
     is(cycle2) {
       // cycle2: perform push or pop operation
       // 2.1: access the related value
-      B_block := io.this_node_value_in
-      lc_block := io.lc_node_value_in
-      rc_block := io.rc_node_value_in
+      B_block := io.this_node_in
+      lc_block := io.lc_node_in
+      rc_block := io.rc_node_in
 
       when(token_block.operation.pop  && !token_block.value.existing) {
         // 2.2.1: perform dequeue operation
@@ -193,9 +170,9 @@ class RPU (val level: Int) extends Module {
       // cycle3: write back
       // 3.1: write the new value back to the memory
       when(token_block.operation.pop || token_block.value.existing) {
-        io.this_node_write_en := true.B
-        io.this_node_pos_out := token_block.position - 1.U
-        io.this_node_value_out := next_B_block
+        io.node_write_en := true.B
+        io.node_pos_out := token_block.position - 1.U
+        io.this_node_out := next_B_block
         io.token_out := next_token_block
       }
 
