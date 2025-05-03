@@ -1,28 +1,14 @@
 package fpga.pheap
 
 import chisel3._
-import chisel3.util._
 import fpga._
 import fpga.pheap.Const._
 
 class PHeap extends Module with PriorityQueueTrait {
   val io = IO(new PQIO)
 
-  val left_levels: Seq[LevelMem] = Seq.tabulate(count_of_levels){ idx =>
-    val level = idx + 1
-    val data_width = 1 << idx
-    val node_width = WireDefault(BNode.default(level)).asUInt.getWidth
-    val heap_level  = Module(new LevelMem(data_width, node_width))
-    heap_level
-  }
-
-  val right_levels: Seq[LevelMem] = Seq.tabulate(count_of_levels){ idx =>
-    val level = idx + 1
-    val data_width = 1 << idx
-    val node_width = WireDefault(BNode.default(level)).asUInt.getWidth
-    val heap_level  = Module(new LevelMem(data_width, node_width))
-    heap_level
-  }
+  val left_levels = create_level_mem(count_of_levels, mem_set)
+  val right_levels = create_level_mem(count_of_levels, mem_set)
 
   val rpus = (1 to count_of_levels).map(level => Module(new RPU(level)))
 
@@ -30,6 +16,7 @@ class PHeap extends Module with PriorityQueueTrait {
   rpus(0).io.token_in.position := 1.U
   rpus(0).io.token_in.value := io.op_in.push
 
+  // TODO: 出队接口需改进
   io.entry_out := Entry.default
 
   when(io.op_in.pop) {
@@ -57,7 +44,7 @@ class PHeap extends Module with PriorityQueueTrait {
     // connect read port and rpu
     left_levels(i).io.r.en := read_en
     left_levels(i).io.r.addr := this_node_pos
-    rpu.io.this_node_in := RegNext(left_levels(i).io.r.data.asTypeOf(new BNode(level)))
+    rpu.io.this_node_in := left_levels(i).io.r.data.asTypeOf(new BNode(level))
 
     left_levels(i).io.w.en := write_en
     left_levels(i).io.w.addr := this_node_pos
@@ -69,15 +56,15 @@ class PHeap extends Module with PriorityQueueTrait {
 
     left_levels(i+1).io.r.en := read_en
     left_levels(i+1).io.r.addr := lc_node_pos
-    rpu.io.lc_node_in := RegNext(left_levels(i+1).io.r.data.asTypeOf(new BNode(level+1)))
+    rpu.io.lc_node_in := left_levels(i+1).io.r.data.asTypeOf(new BNode(level+1))
 
     right_levels(i+1).io.r.en := read_en
     right_levels(i+1).io.r.addr := rc_node_pos
-    rpu.io.rc_node_in := RegNext(right_levels(i+1).io.r.data.asTypeOf(new BNode(level+1)))
+    rpu.io.rc_node_in := right_levels(i+1).io.r.data.asTypeOf(new BNode(level+1))
   }
 
-  right_levels(0).io.r.en := false.B
-  right_levels(0).io.r.addr := 0.U
+  right_levels.head.io.r.en := false.B
+  right_levels.head.io.r.addr := 0.U
 
   // initialize the last layer rpu
   val last_num = count_of_levels - 1
@@ -86,7 +73,7 @@ class PHeap extends Module with PriorityQueueTrait {
   // connect read port and rpu
   left_levels(last_num).io.r.en := last_rpu.io.node_read_en
   left_levels(last_num).io.r.addr := last_rpu.io.node_pos_out
-  last_rpu.io.this_node_in := RegNext(left_levels(last_num).io.r.data.asTypeOf(new BNode(last_num)))
+  last_rpu.io.this_node_in := left_levels(last_num).io.r.data.asTypeOf(new BNode(last_num))
 
   left_levels(last_num).io.w.en := last_rpu.io.node_write_en
   left_levels(last_num).io.w.addr := last_rpu.io.node_pos_out

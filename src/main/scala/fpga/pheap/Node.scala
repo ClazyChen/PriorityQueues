@@ -3,7 +3,6 @@ package fpga.pheap
 import chisel3._
 import chisel3.util._
 import fpga._
-import fpga.Entry
 import fpga.pheap.Const._
 
 // TODO: capacity宽度问题
@@ -57,9 +56,7 @@ object TNode {
   }
 }
 
-
 object TreeIndexing {
-
   // 总层数 -> 总节点数
   def total_node_count: Int = ((1 << count_of_levels) - 1)
 

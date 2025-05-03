@@ -14,8 +14,9 @@ class RPU (val level: Int) extends Module {
     val node_write_en = Output(Bool())
     val node_pos_out  = Output(UInt(level.W))
 
-    val this_node_in = Input(new BNode(level))
+    val this_node_in  = Input(new BNode(level))
     val this_node_out = Output(new BNode(level))
+
     val lc_node_in = Input(new BNode(level+1))
     val rc_node_in = Input(new BNode(level+1))
   })

@@ -4,9 +4,9 @@ import chisel3._
 import chiseltest._
 import org.scalatest.freespec.AnyFreeSpec
 import fpga.Const._
-import fpga.pheap.Const._
+import fpga.pheap._
 
-class PHeapTest extends AnyFreeSpec with ChiselScalatestTester {
+class PHeapTester extends AnyFreeSpec with ChiselScalatestTester {
   def enqueue(dut: PHeap, rank: UInt, metadata: UInt): Unit = {
     dut.io.op_in.pop.poke(false.B)
     dut.io.op_in.push.existing.poke(true.B)
@@ -56,6 +56,7 @@ class PHeapTest extends AnyFreeSpec with ChiselScalatestTester {
     dut.io.op_in.push.metadata.poke(0.U)
     dut.clock.step(cycles)
   }
+
 
   "PHeap should support basic enqueue and dequeue" in {
     test(new PHeap).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>

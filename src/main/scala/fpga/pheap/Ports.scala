@@ -30,68 +30,30 @@ class RWPort(val addr_width: Int, val data_width: Int) extends Bundle {
   val data_out = Output(UInt(data_width.W))
 }
 
-// The trait of a memory
-trait MemoryTrait {
-  // read and return the entry at addr
-  def read(addr: UInt): UInt
-  // write data to the entry at addr
-  def write(addr: UInt, data: UInt): Unit
-  // idle the memory
-  def idle(): Unit
+class PHeapMemIO (val data_depth: Int, val data_width: Int) extends Bundle {
+  val addr_width = log2Ceil(data_depth)
+
+  val r = new ReadPort(addr_width, data_width)
+  val w = new WritePort(addr_width, data_width)
 }
 
-// The trait of 1RW single port memory
-trait SinglePortMemoryImpl extends MemoryTrait {
-  // get the IO interface from the module
-  def getIO: RWPort
-  def read(addr: UInt): UInt = {
-    val io = getIO
-    io.en := true.B
-    io.wen := false.B
-    io.addr := addr
-    io.data_out
-  }
-  def write(addr: UInt, data: UInt): Unit = {
-    val io = getIO
-    io.en := true.B
-    io.wen := true.B
-    io.addr := addr
-    io.data_in := data
-  }
-  def idle(): Unit = {
-    val io = getIO
-    io.en := false.B
-    io.wen := DontCare
-    io.addr := DontCare
-    io.data_in := DontCare
-  }
+trait PHeapMemTrait extends Module{
+  val io: PHeapMemIO
 }
 
-// The trait of 1R1W pseudo-dual-port memory
-trait DualPortMemoryImpl extends MemoryTrait {
-  // get the IO interface from the module
-  def getRPort: ReadPort
-  def getWPort: WritePort
-  def read(addr: UInt): UInt = {
-    val rport = getRPort
-    rport.en := true.B
-    rport.addr := addr
-    rport.data
-  }
-  def write(addr: UInt, data: UInt): Unit = {
-    val wport = getWPort
-    wport.en := true.B
-    wport.addr := addr
-    wport.data := data
-  }
-  def idle(): Unit = {
-    val rport = getRPort
-    val wport = getWPort
-    rport.en := false.B
-    wport.en := false.B
-    rport.addr := DontCare
-    wport.addr := DontCare
-    rport.data := DontCare
+object create_level_mem {
+  def apply(count_of_levels: Int, mem_set: String): Seq[PHeapMemTrait]= {
+    Seq.tabulate(count_of_levels) { idx =>
+      val level = idx + 1
+      val data_width = 1 << idx
+      val node_width = WireDefault(BNode.default(level)).asUInt.getWidth
+
+      val mem: PHeapMemTrait = if (mem_set == "Sram") {
+        Module(new Sram(data_width, node_width))
+      } else {
+        Module(new FFMem(data_width, node_width))
+      }
+      mem
+    }
   }
 }
-
