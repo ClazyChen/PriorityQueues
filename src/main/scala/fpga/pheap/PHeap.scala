@@ -41,5 +41,5 @@ class PHeap (mem_types : Seq[String], total_level : Int = 0) extends Module {
     
     // 连接到外部
     rpus.head.token_in.op := io.op_in
-    io.entry_out := rpus.head.mem_out.value
+
 }

@@ -48,8 +48,20 @@ object Func {
     }
     // 判断是否空闲
     def is_empty (node : Node) : Bool = {
-        node.value.existing == false.B 
+        node.value.existing === false.B 
     }
+    // 生成操作类型
+    def generate_op (node : Node) : State = {
+        val state = WireDefault(State.nop)
+        when (node.op.push.existing && node.op.pop) {
+            state := State.edq
+        }.elsewhen (node.op.push.existing) {
+            state := State.enq
+        }.elsewhen (node.op.pop) {
+            state := State.pop
+        }.otherwise {}
+        state
+    } 
 
     // 把count_of_entries转化成count_of_levels
     def generate_level (current_node_index : Int) : Int = {

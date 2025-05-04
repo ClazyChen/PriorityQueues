@@ -47,90 +47,95 @@ class RPU (val level : Int,val mem_type : String) extends Module {
     io.write_out := false.B
 
      // 设置比较器
-    
-    
+    val cmp_lc_rc = io.pair_in.left_node < io.pair_in.right_node
+    val cmp_input_lc = token.op.push < io.pair_in.left_node
+    val cmp_input_rc = token.op.push < io.pair_in.right_node
+    val swap_enable = token.op.push < mem.io.node_out
 
     // 状态寄存器
     val rCycle0 :: rCycle1 :: rCycle2 :: Nil = Enum(3)
     val state = RegInit(rCycle0)
+
+    // 封装
+    def read_node (position : UInt) : Unit = {
+        mem.read_node := true.B
+        mem.position_in := get_local_index(position, level)
+    }
+    def read_children (position : UInt) : Unit = {
+        io.read_children_out := true.B
+        io.position_out := get_lc_local_index(position, level)
+    }
+    def write (node : Node, position : UInt) : Unit = {
+        mem.io.write := true.B
+        mem.io.node_in := node
+        mem.io.position_in := position
+    }
 
     // FSM
     switch (state) {
         is (rCycle0) {
             when (io.token_in.position) {
                 token := io.token_in // 读入token
-                io.read_child_enable := true.B // 读下一层的两个结点
-                io.addr_out := lc_position // 左孩子全局索引     
-                // 进入下一周期
-                state := cycle2   
-            }
-            .otherwise {}
-        }
-        is (cycle2) {
-            cur_node = mem.read(cal_local_index(i, level), level) // 读当前节点
-            when (io.output_prev_enable) {
-                io.lc_node_out := mem.read(read_left_index, level) // 读左孩子
-                io.rc_node_out := mem.read(read_right_index, level) // 读右孩子
-            }
-            .otherwise {}
-            // 进入下一周期
-            state := cycle3 
-        }
-        is (cycle3) {
-            // 状态转移 实现enqueue dequeue edq
-            when (token.op.push.existing && !token.op.pop) {
-                when (!cur_node.value.existing) {
-                    val new_node = new Node(level) // 要写入sram的结点
-                    new_node.value = token.op.push
-                    new_node.capacity = cur_node.capacity - 1.U
-                    mem.write(cal_local_index(i, level), new_node) // 写入
-                }
-                .otherwise {
-                    val new_node = new Node(level)
-                    when (swap_enable) {
-                        new_node.value = token.op.push
-                        new_node.capacity = cur_node.capacity
-                        mem.write(cal_local_index(i, level),new_node) // swap
-                        // 传递给下一层RPU
-                        io.token_out.op.push.metadata := cur_node.metadata
-                        io.token_out.op.push.rank := cur_node.rank
-                    }.otherwise { // 不用swap
-                        io.token_out.op.push.metadata := token.op.push.metadata
-                        io.token_out.op.push.rank := token.op.push.rank
+                val operator = generate_op(io.token_in)
+                switch (operator) {
+                    is (State.enq) {
+                        read_node(io.token_in.position)
+                        read_children(io.token_in.position)
                     }
-                    io.token_out.op.push.existing := token.op.push.existing
-                    io.token_out.op.pop := token.op.pop
-                    io.token_out.position := Mux(io.lc_node_in.capacity > 1, lc_position, rc_position)
-                }
-            }.elsewhen (token.op.pop && !token.op.push.existing) {
-                val new_node = new Node(level) // 向上一层传递的node
-                when (cmp_lc_rc) { // 左孩子的优先级高
-                    new_node = lc_node
-                    new_node.capacity = lc_node.capacity - 1.U
-                }.otherwise { // 右孩子的优先级高
-                    new_node = rc_node
-                    new_node.capacity = rc_node.capacity - 1.U
-                }
-                mem.write(cal_local_index(i, level), new_node)
-                io.token_out.op := token.op
-                io.token_out.position := Mux(cmp_lc_rc, lc_position, rc_position)
-            }.elsewhen (token.op.pop && token.op.push.existing) { // edq
-                val new_node = new Node(level)
-
-            }.otherwise {
-                // do nothing
-            }          
-            state := cycle1
-        }
-        is (idle) {
-            // idle状态，不需要额外操作
-            when (io.token_in.push.existing || io.token_in.pop) {
-                state := cycle1
+                    is (State.deq) {
+                        read_children(io.token_in.position)
+                    }
+                    is (State.edq) { // repalce
+                        read_node(io.token_in.position)
+                        read_children(io.token_in.position)
+                    }
+                    is (State.nop) {}
+                } 
+                // 进入下一周期
+                state := rCycle1 
             }
-            io.token_out = Token.default(level)
+            .otherwise {}
         }
-        otherwise {
-            // do nothing
+        is (rCycle1) { // keep signals
+            val operator = generate_op(token)
+            switch (operator) {
+                is (State.enq) {
+                    read_node(token.position)
+                    read_children(token.position)
+                }
+                is (State.deq) {
+                    read_children(token.position)
+                }
+                is (State.edq) { // repalce
+                    read_node(token.position)
+                    read_children(token.position)
+                }
+                is (State.nop) {}
+            }
+            // 进入下一周期
+            state := rCycle2 
+        }
+        is (rCycle2) {
+            // 状态转移 实现enqueue dequeue edq
+            val operator = generate_opp(token)
+            switch (operator) {
+                is (State.enq) {
+                    when (is_empty(mem.io.node_out)) {
+                        write()
+                    }.otherwise { // not empty -> swap
+
+                    }
+                }
+                is (State.deq) {
+                    read_children(token.position)
+                }
+                is (State.edq) { // repalce
+                    read_node(token.position)
+                    read_children(token.position)
+                }
+                is (State.nop) {}
+            }
+            state := rCycle0
         }
     }
 

@@ -11,7 +11,7 @@ import fpga.pheap.Func._
 
 
 // 每一层RPU内部的Memory单元,希望选用Sram来实现
-class MemBlock (val level : Int,val mem_type : String) extends Module with MemBlockTrait{ 
+class MemBlock (val level : Int,val mem_type : String) extends Module { 
     // data_depth(addr_width)    data_width
     val local_data_depth = UInt(1 << (level - 1)) // 这一层存储node的数量
     val local_data_width = (Node.default(level).asUInt.getWidth).W
@@ -47,8 +47,7 @@ class MemBlock (val level : Int,val mem_type : String) extends Module with MemBl
     io.pair_out := DontCare
 
     // 根据io.position_in计算local_index
-    val local_index = Wire(UInt(position_width(level).W))
-    local_index := get_local_index(io.position_in, level)
+    val local_index_reg = RegInit(0.U(positionWidth(level).W))
 
     // 在存储单元中也使用一个状态机  
     val mCycle0 :: mCycle1 :: mCycle2 :: Nil = Enum(3)
@@ -63,6 +62,7 @@ class MemBlock (val level : Int,val mem_type : String) extends Module with MemBl
     switch (mem_state_reg) {
         is (mCycle0) {
             when (io.read_node) {
+                val local_index = get_local_index(io.position_in, level)
                 val node = memory.read(local_index).asTypeOf(new Node(level)) // 读出的变量用node保存
                 mem_state_reg := mCycle1
             }.elsewhen (io.read_children) {
