@@ -7,64 +7,91 @@ import fpga._
 import fpga.Const._
 import fpga.Node
 import fpga.mem
+import fpga.pheap.Func._
 
-// 用trait实现对memory读写
-trait MemoryTrait {
-    // 从目标level的memory读数据
-    def read (addr : UInt,cur_level : Int) : Node = {
-        val r = getRPort
-        r.en := true.B
-        r.addr := addr
-        r.data.asTypeOf(new Node(cur_level))
-    }
-    // 向memory写数据
-    def write (addr : UInt,Node : node) : Unit = {
-        val w = getWPort
-        w.en := true.B
-        r.addr := addr
-        r.data := node.asUInt
-    }
-    // 停机
-    def idle : Unit = {
-        val r = getRPort
-        val w = getWPort
-        r.en := false.B
-        w.en := false.B
-        r.addr := DontCare
-        w.addr := DontCare
-        w.data := DontCare 
-    }
-}
-// 每一层RPU内部的Memory
-class MemBlock (val level : Int,val mem_type : String) extends Module with MemoryTrait { 
-    // 计算addr_width和data_width
-    val local_data_depth = UInt(1 << (level - 1))
-    val local_data_width = (Node.asUInt).W
-    val local_addr_width = log2Ceil(local_data_depth + 1) 
-    // 对外暴露的接口
+
+// 每一层RPU内部的Memory单元,希望选用Sram来实现
+class MemBlock (val level : Int,val mem_type : String) extends Module with MemBlockTrait{ 
+    // data_depth(addr_width)    data_width
+    val local_data_depth = UInt(1 << (level - 1)) // 这一层存储node的数量
+    val local_data_width = (Node.default(level).asUInt.getWidth).W
+
     val io = IO(new Bundle {
-        val r = new ReadPort(local_addr_width, local_data_width) // 读
-        val w = new WritePort(local_addr_width, local_data_width) // 写
+        val node_in = Input(new Node(level))
+        val pair_out = Output(new Pair(level)) // read children nodes
+        val node_out = Output(new Node(level)) // read node in current level
+        val read_node = Input(Bool())
+        val read_children = Input(Bool())
+        val write = Input(Bool())
+        val position_in = Input(UInt(position_width(level).W)) // 传入一个global position
     })
-    // 根据需求选用不同的memory
+    
+    // different type of memory
     switch (mem_type) {
         is ("Sram") {
-            val memory = new Sram(local_data_depth,local_data_width)
+            val memory = Module(new Sram(local_data_depth,local_data_width))
         }
         is ("SinglePortSram") {
-            val memory = new SinglePortSram(local_data_depth,local_data_width)
+            val memory = Module(new SinglePortSram(local_data_depth,local_data_width))
         }
         is ("FFMem") {
-            val memory = new FFMem(local_data_depth,local_data_width)
+            val memory = Module(new FFMem(local_data_depth,local_data_width))
         }
         is ("SinglePortFFMem") {
-            val memory = new SinglePortFFMem(local_data_depth,local_data_width)
+            val memory = Module(new SinglePortFFMem(local_data_depth,local_data_width))
         }
     }
-    // 端口连接
-    memory.io.r <> io.r
-    memory.io.w <> io.w
-    // 获取MemoryBlock端口
-    def getRPort: ReadPort  = io.r
-    def getWPort: WritePort = io.w
+
+    // 端口初始化
+    io.node_out := DontCare
+    io.pair_out := DontCare
+
+    // 根据io.position_in计算local_index
+    val local_index = Wire(UInt(position_width(level).W))
+    local_index := get_local_index(io.position_in, level)
+
+    // 在存储单元中也使用一个状态机  
+    val mCycle0 :: mCycle1 :: mCycle2 :: Nil = Enum(3)
+    val mem_state_reg = RegInit(mCycle0)
+    val left_node = RegInit(Node.default)
+    val current_node = RegInit(Node.default)
+    val pair_node = Wire(UInt((Pair.default.asUInt).W))
+
+    // 操作sram单元
+    // sram每次读出来一个pair类型，包含两个node，这个过程不能在一个周期内完成
+    // 上层read/write信号的保持由上层模块负责实现
+    switch (mem_state_reg) {
+        is (mCycle0) {
+            when (io.read_node) {
+                val node = memory.read(local_index).asTypeOf(new Node(level)) // 读出的变量用node保存
+                mem_state_reg := mCycle1
+            }.elsewhen (io.read_children) {
+                val left = memory.read(local_index).asTypeOf(new Node(level))
+                mem_state_reg := mCycle1
+            }.elsewhen (io.write) {
+                mem.write(local_index, io.node_in.asUInt)
+                mem_state_reg := mCycle0
+            }.otherwise {}
+        }
+        is (mCycle1) { // read children nodes : need more cycles
+            when (io.read_node) {
+                current_node := node
+                mem_state_reg := mCycle2 // current_node valid
+            }.elsewhen (io.read_children) {
+                left_node := left
+                val right = memory.read(local_index + 1.U).asTypeOf(new Node(level))
+                mem_state_reg := mCycle2
+            }.otherwise {}
+        }
+        is (mCycle2) {
+            io.node_out := current_node
+            io.pair_out.left_node := left_node
+            io.pair_out.right_node := right
+            when (io.write) {
+                memory.write(local_index, io.node_in.asUInt)
+            }
+            mem_state_reg := mCycle0
+        }
+    }
+
 }

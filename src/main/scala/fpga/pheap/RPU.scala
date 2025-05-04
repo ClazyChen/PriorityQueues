@@ -6,55 +6,57 @@ import chisel3.util._
 import fpga._
 import fpga.Const._
 import fpga.Node._
+import fpga.pheap.Func._
 
 
-// 分层实现PHeap
+// 分层实现PHeap,基于RPU(rank processing unit)
 class RPU (val level : Int,val mem_type : String) extends Module {
     val io = IO(new Bundle {
-        // token array 传递的数据
-        val token_in = Input(new Token(level)) // 上一层RPU传入的token
-        val token_out = Output(new Token(level + 1)) // 当前RPU向下一层传递的token
-        // binary array 传递的数据
-        val mem_out = Output(new Node(level + 1)) // 用于输出当前的node,用于外部接收,测试
-        val lc_node_in = Input(new Node(level + 1)) // 左孩子输入
-        val rc_node_in = Input(new Node(level + 1)) // 右孩子输入
-        val lc_node_out = Output(new Node(level)) // 当前RPU作为左孩子传递给上层RPU的node
-        val rc_node_out = Output(new Node(level)) // 当前RPU作为右孩子传递给上层RPU的node
-        val addr_in = Input(UInt(position_width(level - 1).W)) // 上一层传入的position
-        val addr_out = Output(UInt(position_width(level).W)) // 向下一层传入的position
-        val read_child_enable = Output(Bool()) // 读子孩子结点的使能信号
-        val output_prev_enable = Input(Bool()) // 向上一层传递两个结点的使能信号
+        // token array 
+        val token_in = Input(new Token(level)) 
+        val token_out = Output(new Token(level + 1)) 
+        // binary array 
+        val pair_in = Input(new Pair(level + 1)) // 两个孩子节点
+        val pair_out = Output(new Pair(level))
+        val node_in = Input(new Node(level - 1)) // 从上层接收的node
+        val node_out = Output(new Node(level)) 
+        val position_in = Input(UInt(position_width(level).W)) // 上层传入的lc_position
+        val position_out = Output(UInt(position_width(level + 1).W)) // 向下层传递的lc_position
+        val read_children_in = Input(Bool()) // 读下层RPU
+        val read_children_out = Output(Bool())
+        val write_in = Input(Bool()) // 下层RPU写
+        val write_out = Output(Bool())
     })
-
-    // 用寄存器保存token
+    
+    // RPU内部存储结构
     val token = RegInit(Token.default(level))
-    token := io.token_in
-    // 指定memory的实现方式
-    val mem = Module(new MemBlock(level,mem_type))
+    val mem = Module(new MemBlock(level, mem_type))
+    io.pair_out := mem.io.pair_out
+    mem.io.node_in := io.node_in
+    io.node_out := mem.io.node_out
+    mem.io.position_in := io.position_in
+    mem.io.read_children := io.read_children
+    mem.io.write := io.write
 
-    // 组合逻辑辅助信号
-    val read_left_index = cal_local_index(io.addr_in, level)
-    val read_right_index = read_left_index + 1.U
-    val lc_position =  get_lc_g_index(i) // 当前下标i的左孩子position
-    val rc_position =  get_rc_g_index(i) // 当前下标i的右孩子position
-
-    // 相关变量
-    val i = io.token_in.position // 读出i
-    val v = io.token_in.op.push // 读出v
-    val cur_node = new Node(level) // 当前结点
+    // 信号初始化
+    io.token_out := DontCare
+    io.pair_out := DontCare
+    io.node_out := DontCare
+    io.position_out := 0.U
+    io.read_children_out := false.B
+    io.write_out := false.B
 
      // 设置比较器
-    val swap_enable = token.op.push < cur_node.value
-    val cmp_lc_rc = io.lc_node_in.value < io.rc_node_in.value
+    
+    
 
-    // 时钟周期 状态寄存器
-    val idle :: cycle1 :: cycle2 :: cycle3 :: Nil = Enum(4)
-    val state = RegInit(idle)
+    // 状态寄存器
+    val rCycle0 :: rCycle1 :: rCycle2 :: Nil = Enum(3)
+    val state = RegInit(rCycle0)
 
     // FSM
     switch (state) {
-        // read token_in
-        is (cycle1) {
+        is (rCycle0) {
             when (io.token_in.position) {
                 token := io.token_in // 读入token
                 io.read_child_enable := true.B // 读下一层的两个结点
@@ -114,7 +116,7 @@ class RPU (val level : Int,val mem_type : String) extends Module {
                 io.token_out.position := Mux(cmp_lc_rc, lc_position, rc_position)
             }.elsewhen (token.op.pop && token.op.push.existing) { // edq
                 val new_node = new Node(level)
-                
+
             }.otherwise {
                 // do nothing
             }          
@@ -132,13 +134,14 @@ class RPU (val level : Int,val mem_type : String) extends Module {
         }
     }
 
-    // connect all the rpus
+    // connect all rpus
     def ~> (next : RPU) {
         this.io.token_out <> next.io.token_in
-        this.io.addr_out <> next.io.addr_in
-        this.io.lc_node_in <> next.io.lc_node_out
-        this.io.rc_node_in <> next.io.rc_node_out
-        this.io.read_child_enable <> next.io.output_prev_enable
+        this.io.pair_in <> next.io.pair_out
+        this.io.node_out <> next.io.node_in
+        this.io.position_out <> next.io.position_in
+        this.io.read_children_out <> next.io.read_children_in
+        this.io.write_out <> next.io.write_in
     }
 
 }
