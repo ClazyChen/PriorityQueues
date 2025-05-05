@@ -63,9 +63,12 @@ class MemBlock (val level : Int,val mem_type : String) extends Module {
         is (mCycle0) {
             when (io.read_node) {
                 val local_index = get_local_index(io.position_in, level)
+                local_index_reg := local_index
                 val node = memory.read(local_index).asTypeOf(new Node(level)) // 读出的变量用node保存
                 mem_state_reg := mCycle1
             }.elsewhen (io.read_children) {
+                val local_index = get_local_index(io.position_in, level)
+                local_index_reg := local_index
                 val left = memory.read(local_index).asTypeOf(new Node(level))
                 mem_state_reg := mCycle1
             }.elsewhen (io.write) {
@@ -79,7 +82,7 @@ class MemBlock (val level : Int,val mem_type : String) extends Module {
                 mem_state_reg := mCycle2 // current_node valid
             }.elsewhen (io.read_children) {
                 left_node := left
-                val right = memory.read(local_index + 1.U).asTypeOf(new Node(level))
+                val right = memory.read(local_index_reg + 1.U).asTypeOf(new Node(level))
                 mem_state_reg := mCycle2
             }.otherwise {}
         }

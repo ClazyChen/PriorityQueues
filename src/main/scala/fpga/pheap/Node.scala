@@ -69,7 +69,7 @@ object Pair {
     }
 }
 
-// operation type
+// enum operation type
 object State extends ChiselEnum { 
   val enq, deq, edq, nop = Value
 }

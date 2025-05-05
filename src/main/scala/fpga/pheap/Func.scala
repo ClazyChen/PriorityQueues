@@ -51,14 +51,14 @@ object Func {
         node.value.existing === false.B 
     }
     // 生成操作类型
-    def generate_op (node : Node) : State = {
+    def generate_op (token : Token) : State.Type = {
         val state = WireDefault(State.nop)
-        when (node.op.push.existing && node.op.pop) {
+        when (token.op.push.existing && token.op.pop) {
             state := State.edq
-        }.elsewhen (node.op.push.existing) {
+        }.elsewhen (token.op.push.existing) {
             state := State.enq
-        }.elsewhen (node.op.pop) {
-            state := State.pop
+        }.elsewhen (token.op.pop) {
+            state := State.deq
         }.otherwise {}
         state
     } 

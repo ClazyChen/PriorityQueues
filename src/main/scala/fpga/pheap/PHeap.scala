@@ -11,9 +11,13 @@ import fpga.pheap.Func._
 
 // top-module : P-Heap
 // 设置level为参数，指定时，使用这个level，不指定时，动态计算最少level
-class PHeap (mem_types : Seq[String], total_level : Int = 0) extends Module {
-    
-    val io = IO(new PQIO)
+class PHeap (mem_types : Seq[String], total_level : Int = 0) extends Module with PriorityQueueTrait {
+    // pheapIO
+    class PheapIO extends PQIO {
+        val position_in = Input(UInt(1.W))
+    }
+    // override io
+    override val io = new PheapIO
 
     // 获取level,根据具体的输入
     when (!total_level)  {
@@ -40,6 +44,8 @@ class PHeap (mem_types : Seq[String], total_level : Int = 0) extends Module {
     }
     
     // 连接到外部
-    rpus.head.token_in.op := io.op_in
+    rpus.head.io.token_in.op := io.op_in
+    rpus.head.io.token_in.position := io.position_in
+    io.entry_out := rpus.head.node_out.value
 
 }
