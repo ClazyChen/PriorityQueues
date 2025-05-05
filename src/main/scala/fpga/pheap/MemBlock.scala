@@ -86,7 +86,7 @@ class MemBlock (val level : Int,val mem_type : String) extends Module {
                 mem_state_reg := mCycle2
             }.otherwise {}
         }
-        is (mCycle2) {
+        is (mCycle2) { // output
             io.node_out := current_node
             io.pair_out.left_node := left_node
             io.pair_out.right_node := right

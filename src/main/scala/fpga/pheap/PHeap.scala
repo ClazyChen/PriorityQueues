@@ -38,7 +38,7 @@ class PHeap (mem_types : Seq[String], total_level : Int = 0) extends Module with
         }
     }
 
-    // RPUs 模块连接
+    // rpus模块连接
     for (i <- 0 until (total_levels - 1)) {
         rpus(i) ~> rpus(i + 1)
     }

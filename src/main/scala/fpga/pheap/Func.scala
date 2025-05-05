@@ -62,6 +62,17 @@ object Func {
         }.otherwise {}
         state
     } 
+    // 判断capacity是否满足capacity > 1
+    def is_capacity_valid (node : Node) : Bool = {
+        node.capacity >= 1
+    }
+    // 用三个比较器来计算rank最低(优先级最高)的元素下标
+    // def get_lowest_position (signal_0 : Bool, signal_1 : Bool, 
+    // signal_2 : Bool, position : UInt) : UInt = {
+    //     // get_lowest_position(cmp_lc_rc, cmp_input_lc, cmp_input_rc, token.position)
+
+
+    // }
 
     // 把count_of_entries转化成count_of_levels
     def generate_level (current_node_index : Int) : Int = {
