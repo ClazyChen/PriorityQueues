@@ -28,13 +28,6 @@ object Node {
         node
     }
 
-    def test(level : Int): Node = {
-        val node       = Wire(new Node(level))
-        node.entry    := Entry.default
-        node.capacity := -1.S(capacity_width(level).W).asUInt - 1.U
-        node
-    }
-
     def getWidth(level : Int): Int = (new Node(level)).getWidth
 
 }
@@ -52,12 +45,6 @@ object Pair {
         pair
     }
 
-    def test(level: Int): Pair = {
-        val pair = Wire(new Pair(level))
-        pair.first  := Node.test(level)
-        pair.second := Node.test(level)
-        pair
-    }
 }
 
 
@@ -74,11 +61,5 @@ object TokenNode {
         token_node
     }
 
-    def init(level: Int, op: Operator = Operator.nop): TokenNode = {
-        val token_node = Wire(new TokenNode(level)) 
-        token_node.op := op
-        token_node.position := 0.U
-        token_node
-    }
 }
 

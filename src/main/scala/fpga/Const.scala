@@ -5,7 +5,7 @@ package fpga
 object Const {
 
     // number of entries in the priority queue
-    val count_of_entries = 15
+    val count_of_entries = 31
 
     // the width of the metadata
     val metadata_width = 32

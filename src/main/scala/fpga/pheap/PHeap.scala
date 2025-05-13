@@ -16,47 +16,25 @@ class PHeap extends Module with PriorityQueueTrait {
         level_module
     }
 
+    // 直接在rpus(1)中将结果读出
     io.entry_out := rpus(1).io.left_node_out.entry
 
     rpus(1).io.parent_pos_in := 0.U
 
-    // when(io.op_in.pop && io.op_in.push.existing && rpus(1).io.left_node_out.entry < io.op_in.push) {
-    //     rpus(1).io.token_in := TokenNode.init(1)
-    // } .otherwise {
-    //     rpus(1).io.token_in := TokenNode.init(1,io.op_in)
-    // }
-    val token = TokenNode.init(1)
+    val token = TokenNode.default(1)
     token.op := io.op_in
     rpus(1).io.token_in := token
 
     rpus.last.io.lc_node_in := DontCare
     rpus.last.io.rc_node_in := DontCare
 
-    // for (i <- 1 until count_of_levels) {
-    //     rpus(i) ~> rpus(i + 1)
-    // }
-
-    // PHeap.scala 中
-    // 1) head 特殊接法（无前驱）
+    // rpus(0)在这里没有作用
     rpus(0).io.token_in      := DontCare
     rpus(0).io.parent_pos_in := DontCare
     rpus(0).io.lc_node_in    := DontCare
     rpus(0).io.rc_node_in    := DontCare
 
-    // 2) 显式打拍链接
     for (i <- 1 until count_of_levels) {
-    // 建四个寄存器，分别对应一对一方向
-        // val token_reg      = RegNext(rpus(i).io.token_out)
-        // val parent_reg     = RegNext(rpus(i).io.cur_pos_out)
-        // val left_node_reg  = RegNext(rpus(i+1).io.left_node_out)
-        // val right_node_reg = RegNext(rpus(i+1).io.right_node_out)
-
-        // // 然后再一次性把它们连到 IO 上
-        // rpus(i+1).io.token_in     := token_reg
-        // rpus(i+1).io.parent_pos_in:= parent_reg
-
-        // rpus(i).io.lc_node_in     := left_node_reg
-        // rpus(i).io.rc_node_in     := right_node_reg
         rpus(i+1).io.token_in     := rpus(i).io.token_out
         rpus(i+1).io.parent_pos_in:= rpus(i).io.cur_pos_out
         rpus(i).io.lc_node_in     := rpus(i+1).io.left_node_out

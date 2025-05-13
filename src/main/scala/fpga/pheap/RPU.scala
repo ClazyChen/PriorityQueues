@@ -25,23 +25,20 @@ class RPU(val level: Int) extends Module {
     // mem初始化需要get_pair_depth个周期，写入空pair
     val mem = Module(new Memory(level))
 
-    // val token = RegInit(TokenNode.init(level))
-    // TODO 应该对token_in和token_out进行区分
+    // 应该对token_in和token_out进行区分
     // token_in存储输入的io.token_in，因为io.token_in信号不稳定
     // token_out对应于对下一级rpu的操作，需要根据token_in的信号来确定
     val token_in = RegInit(io.token_in)
-    val token_out = RegInit(TokenNode.init(level))
+    val token_out = RegInit(TokenNode.default(level))
     
     // token_out只在cycle1状态进行输出，其他状态不输出
     // 也就是说，除了level1,其他level的token_in信号都只能在idle状态下接收到
     // 在下一个状态，token_in信号将变成无效值
-    io.token_out := TokenNode.init(level)
+    io.token_out := TokenNode.default(level)
 
     val addr = pos2addr(level, token_in.position)
     val lc_pos = RegInit(get_lc_pos(io.token_in.position))
     val rc_pos = RegInit(get_rc_pos(io.token_in.position))
-    // val left_node = RegInit(Node.default(level))
-    // val right_node = RegInit(Node.default(level))
     val left_node = Wire(new Node(level))
     val right_node = Wire(new Node(level))
     val left_pos = get_lc_pos(io.parent_pos_in)
@@ -49,7 +46,6 @@ class RPU(val level: Int) extends Module {
     val new_pair = Wire(new Pair(level))
     val new_node = Wire(new Node(level))
 
-    // 初始化
     new_pair := Pair.default(level)
     new_node := Node.default(level)
     idle()
@@ -60,6 +56,7 @@ class RPU(val level: Int) extends Module {
     io.left_node_out := left_node
     io.right_node_out := right_node
     
+    // 用2个比较器加快local_enqueue_dequeue
     val cmp_token_lc = io.lc_node_in.entry > token_in.op.push
     val cmp_token_rc = io.rc_node_in.entry > token_in.op.push
     val cmp_lc_rc = io.rc_node_in.entry > io.lc_node_in.entry
@@ -135,10 +132,7 @@ class RPU(val level: Int) extends Module {
                 token_out := io.token_in
                 lc_pos := get_lc_pos(io.token_in.position)
                 rc_pos := get_rc_pos(io.token_in.position)
-                // val pair = read(addr)
-                // // TODO 为什么读出的空节点capacity为0？
-                // left_node := pair.first
-                // right_node := pair.second
+                // left_node, right_node接到mem的输出上, read后的下一个周期获取到输出
                 read(addr)
                 state := sCycle0
             }
@@ -146,7 +140,7 @@ class RPU(val level: Int) extends Module {
                 io.token_out := token_out
                 pass_down := false.B
             } .otherwise {
-                io.token_out := TokenNode.init(level) 
+                io.token_out := TokenNode.default(level) 
             }
         }
         is(sCycle0) {
@@ -174,14 +168,6 @@ class RPU(val level: Int) extends Module {
             idle()
             state := sIdle
         }
-    }
-
-
-    def ~>(next: RPU) = {
-        next.io.token_in := RegNext(this.io.token_out)
-        next.io.parent_pos_in := RegNext(this.io.cur_pos_out)
-        this.io.lc_node_in := RegNext(next.io.left_node_out)
-        this.io.rc_node_in := RegNext(next.io.right_node_out)
     }
 
     def read(addr: UInt) = {

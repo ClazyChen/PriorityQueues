@@ -6,6 +6,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import scala.util.Random
 import scala.collection.mutable.PriorityQueue
 import fpga.Const._
+import fpga.pheap.Param._
 
 // a black box for the priority queue
 object BlackBox {
@@ -125,7 +126,8 @@ object BlackBox {
         lazy implicit val pq = c
 
         // TODO 给时间完成初始化
-        pq.clock.step(4)
+        // pq.clock.step(4)
+        pq.clock.step(get_pair_depth(count_of_levels))
 
 
         // initialize the priority queue
