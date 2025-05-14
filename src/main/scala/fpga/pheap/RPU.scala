@@ -22,16 +22,28 @@ class RPU (val level : Int,val mem_type : String) extends Module {
         val node_out = Output(new Node(level)) 
         val position_in = Input(UInt(position_width(level).W)) // 上层传入的lc_position
         val position_out = Output(UInt(position_width(level + 1).W)) // 向下层传递的lc_position
-        val read_children_in = Input(Bool()) // 读下层RPU
+        val read_children_in = Input(Bool()) // RPU读孩子节点
         val read_children_out = Output(Bool())
-        val write_in = Input(Bool()) // 下层RPU写
+        val write_in = Input(Bool()) // RPU写
         val write_out = Output(Bool())
     })
     
-    // RPU内部存储结构
+    // RPU内部结构
     val token = RegInit(Token.default(level))
     val token_next = RegInit(Token.default(level))
     val mem = Module(new MemBlock(level, mem_type))
+    val operator = WireDefault(State.nop)
+    val write_current_node = Wire(Node.default(level))
+    val write_next_node = Wire(Node.default(level + 1))
+    val token_op = Wire(new Token(level + 1)) // deq
+    val next_rpu_position = Wire(UInt((position_width(level + 1)).W))
+    val lower_rank_position = Wire(UInt(position_width(level + 1).W))
+    val lower_node = Wire(Node.default(level + 1))
+    val next_token = Wire(new Token(level + 1)) // edq
+    val lowest_rank_position = Wire(UInt(position_width(level + 1).W)) // edq 
+    val edq_node = Wire(new Node(level)) // edq
+
+    // connect RPU interface and MemBlock interface
     io.pair_out := mem.io.pair_out
     mem.io.node_in := io.node_in
     io.node_out := mem.io.node_out
@@ -49,8 +61,8 @@ class RPU (val level : Int,val mem_type : String) extends Module {
 
      // 设置比较器
     val cmp_lc_rc = io.pair_in.left_node < io.pair_in.right_node
-    val cmp_input_lc = token.op.push < io.pair_in.left_node
-    val cmp_input_rc = token.op.push < io.pair_in.right_node
+    val cmp_parent_lc = mem.io.node_out < io.pair_in.left_node
+    val cmp_parent_rc = mem.io.node_out < io.pair_in.right_node
     val swap_enable = token.op.push < mem.io.node_out
 
     // 状态寄存器
@@ -61,11 +73,11 @@ class RPU (val level : Int,val mem_type : String) extends Module {
     // 封装
     def read_node (position : UInt) : Unit = {
         mem.read_node := true.B
-        mem.position_in := get_local_index(position, level)
+        mem.position_in := position
     }
     def read_children (position : UInt) : Unit = {
         io.read_children_out := true.B
-        io.position_out := get_lc_local_index(position, level)
+        io.position_out := get_lc_global_index(position, level)
     }
     def write_node (node : Node, position : UInt) : Unit = {
         mem.io.write := true.B
@@ -83,7 +95,7 @@ class RPU (val level : Int,val mem_type : String) extends Module {
         is (rCycle0) {
             when (io.token_in.position) {
                 token := io.token_in // 读入token
-                val operator = generate_op(io.token_in)
+                operator = generate_op(io.token_in)
                 switch (operator) {
                     is (State.enq) {
                         read_node(io.token_in.position)
@@ -103,8 +115,8 @@ class RPU (val level : Int,val mem_type : String) extends Module {
             }
             .otherwise {}
         }
-        is (rCycle1) { // keep signals
-            val operator = generate_op(token) // token already update
+        is (rCycle1) { // keep signals unchanged
+            operator = generate_op(token) // token has already been updated
             switch (operator) {
                 is (State.enq) {
                     read_node(token.position)
@@ -114,8 +126,16 @@ class RPU (val level : Int,val mem_type : String) extends Module {
                     read_children(token.position)
                 }
                 is (State.edq) { // repalce
-                    read_node(token.position)
-                    read_children(token.position)
+                    when (io.token_in.position === 1.U) { // edq : replace position 1
+                        edq_node.capacity := mem.io.node_out.capacity
+                        edq_node.value := token.op.push
+                        read_node(token.position)
+                        write_node(edq_node, token.position)
+                        read_children(token.position)
+                    }.otherwise {
+                        read_node(token.position)
+                        read_children(token.position) 
+                    }  
                 }
                 is (State.nop) {}
             }
@@ -123,30 +143,30 @@ class RPU (val level : Int,val mem_type : String) extends Module {
             state := rCycle2 
         }
         is (rCycle2) {
-            // 状态转移 实现enqueue dequeue edq
-            val operator = generate_op(token)
+            // 状态转移 实现enqueue dequeue enqueue-dequeue
+            operator = generate_op(token)
             switch (operator) {
                 is (State.enq) {
-                    when (is_empty(mem.io.node_out)) {
-                        val write_current_node = Node.generate(level, token.op.push, mem.io.node_out.capacity - 1.U)
+                    when (is_empty(mem.io.node_out)) { // empty -> insert
+                        write_current_node = Node.generate(level, token.op.push, mem.io.node_out.capacity - 1.U)
                         write_node(write_current_node, token.position)
-                        token_next := Token.default(level)
+                        token_next := Token.default(level + 1)
                         io.token_out := token_next
-                        token := Token.default(level)
+                        token := Token.default(level) // 防止当前RPU多余操作
                     }.otherwise { // not empty -> swap
                         when (swap_enable) {
-                            val write_current_node = Node.generate(level, token.op.push, mem.io.node_out.capacity)
+                            write_current_node = Node.generate(level, token.op.push, mem.io.node_out.capacity)
                             write_node(write_current_node, token.position)
-                            val token_op = new Token(level + 1)
+                            // generate new token
                             token_op.push := mem.io.node_out.value
                             token_op.pop := token.op.pop
-                            val next_rpu_position = Mux(is_capacity_valid(io.pair_in.left),
+                            next_rpu_position = Mux(is_capacity_valid(io.pair_in.left),
                             get_lc_global_index(token.position), get_rc_global_index(token.position))
                             token_next := Token.generate(level + 1, token_op, next_rpu_position)
                             io.token_out := token_next
                             token := Token.default(level)
                         }.otherwise {
-                            val next_rpu_position = Mux(is_capacity_valid(io.pair_in.left),
+                            next_rpu_position = Mux(is_capacity_valid(io.pair_in.left),
                             get_lc_global_index(token.position), get_rc_global_index(token.position))
                             token_next := Token.generate(level + 1, token.op, next_rpu_position)
                             io.token_out := token_next
@@ -156,37 +176,46 @@ class RPU (val level : Int,val mem_type : String) extends Module {
                 }
                 is (State.deq) {
                     // write binary heap
-                    val lower_rank_position = Mux(cmp_lc_rc, get_lc_global_index(token.position),
+                    lower_rank_position = Mux(cmp_lc_rc, get_lc_global_index(token.position),
                      get_rc_global_index(token.position))
-                    val lower_node = Mux(cmp_lc_rc, io.pair_in.left, io.pair_in.right)
-                    val write_current_node = Node.generate(level, lower_node, mem.io.node_out.capacity + 1.U)
+                    lower_node = Mux(cmp_lc_rc, io.pair_in.left, io.pair_in.right)
+                    write_current_node = Node.generate(level, lower_node, mem.io.node_out.capacity + 1.U)
                     write_node(write_current_node, token.position)
-                    val write_next_node = Node.generate(level + 1, Node.default.value, lower_node.capacity + 1.U)
+                    write_next_node = Node.generate(level + 1, Node.default.value, lower_node.capacity + 1.U)
                     write_children(write_next_node, lower_rank_position)
-                    // pass token
+                    // deliver token
                     token_next := Token.generate(level + 1, token.op, lower_rank_position)
                     io.token_out := token_next
                     token := Token.default(level)
                 }
-                is (State.edq) { // repalce
-                    // write binary heap
-                    when (token.position === 1.U) {
-                        val write_current_node = Node.generate(level, token.op.push, mem.io.node_out.capacity)
-                        write_node(write_current_node, token.position)
-                        // pass token
-                        val next_token = new Token(level + 1)
-                        next_token.op.pop := token.pop
-                        next_token.op.push.existing := false.B
-                        next_token.op.push.rank := 0.U(position_width(level + 1.U))
-                        next_token.op.push.metadata := 0.U(token.position.W)
-                        token_next := next_token
+                is (State.edq) { // repalce(enqueue-dequeue)
+                    lowest_rank_position = get_lowest_position()
+                    // deliver token
+                    when (lowest_rank_position === token.position) {
+                        token_next := Token.default(level + 1)
+                        io.token_out := token_next
+                        token := Token.default(level)
+                    }.elsewhen (lowest_rank_position === get_lc_global_index(token.position)) {
+                        // write binary heap
+                        write_node(io.pair_in.left_node, token.position)
+                        write_children(io.node_out, get_lc_global_index(token.position))
+                        // Token generate (target_level : Int, op : Operator, position : Int)
+                        token_next := Token.generate(level + 1, token.op , get_lc_global_index(token.position))
+                        io.token_out := token_next
+                        token := Token.default(level)
+                    }.elsewhen (lowest_rank_position == get_rc_global_index(token.position)) {
+                        write_node(io.pair_in.right_node, token.position)
+                        write_children(io.node_out, get_rc_global_index(token.position))
+                        token_next := Token.generate(level + 1, token.op , get_rc_global_index(token.position))
                         io.token_out := token_next
                         token := Token.default(level)
                     }.otherwise {}
                 }
-                is (State.nop) {}
+                is (State.nop) {
+                    // do nothing
+                }
             }
-            state := rCycle0
+            state := rCycle0 // go back to first state
         }
     }
 

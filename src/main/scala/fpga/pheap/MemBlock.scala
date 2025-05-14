@@ -8,6 +8,7 @@ import fpga.Const._
 import fpga.Node
 import fpga.mem
 import fpga.pheap.Func._
+import fpga.pheap.FFMem._
 
 
 // 每一层RPU内部的Memory单元,希望选用Sram来实现
@@ -16,6 +17,7 @@ class MemBlock (val level : Int,val mem_type : String) extends Module {
     val local_data_depth = UInt(1 << (level - 1)) // 这一层存储node的数量
     val local_data_width = (Node.default(level).asUInt.getWidth).W
 
+    // MemBlock IO (in a RPU)
     val io = IO(new Bundle {
         val node_in = Input(new Node(level))
         val pair_out = Output(new Pair(level)) // read children nodes
@@ -25,7 +27,7 @@ class MemBlock (val level : Int,val mem_type : String) extends Module {
         val write = Input(Bool())
         val position_in = Input(UInt(position_width(level).W)) // 传入一个global position
     })
-    
+
     // different type of memory
     switch (mem_type) {
         is ("Sram") {
@@ -41,7 +43,7 @@ class MemBlock (val level : Int,val mem_type : String) extends Module {
             val memory = Module(new SinglePortFFMem(local_data_depth,local_data_width))
         }
     }
-
+    
     // 端口初始化
     io.node_out := DontCare
     io.pair_out := DontCare
@@ -54,7 +56,11 @@ class MemBlock (val level : Int,val mem_type : String) extends Module {
     val mem_state_reg = RegInit(mCycle0)
     val left_node = RegInit(Node.default)
     val current_node = RegInit(Node.default)
+    val local_index = Wire(UInt((position_width(level)).W))
     val pair_node = Wire(UInt((Pair.default.asUInt).W))
+    val node = Wire(UInt((Node.default.asUInt).W))
+    val left = Wire(UInt((Node.default.asUInt).W))
+    val right = Wire(UInt((Node.default.asUInt).W))
 
     // 操作sram单元
     // sram每次读出来一个pair类型，包含两个node，这个过程不能在一个周期内完成
@@ -62,27 +68,35 @@ class MemBlock (val level : Int,val mem_type : String) extends Module {
     switch (mem_state_reg) {
         is (mCycle0) {
             when (io.read_node) {
-                val local_index = get_local_index(io.position_in, level)
+                local_index = get_local_index(io.position_in, level)
                 local_index_reg := local_index
-                val node = memory.read(local_index).asTypeOf(new Node(level)) // 读出的变量用node保存
+                node = memory.read(local_index).asTypeOf(new Node(level)) // 读出的变量用node保存
                 mem_state_reg := mCycle1
             }.elsewhen (io.read_children) {
-                val local_index = get_local_index(io.position_in, level)
+                local_index = get_local_index(io.position_in, level)
                 local_index_reg := local_index
-                val left = memory.read(local_index).asTypeOf(new Node(level))
+                left = memory.read(local_index).asTypeOf(new Node(level))
                 mem_state_reg := mCycle1
             }.elsewhen (io.write) {
+                local_index = get_local_index(io.position_in, level)
                 mem.write(local_index, io.node_in.asUInt)
                 mem_state_reg := mCycle0
             }.otherwise {}
         }
         is (mCycle1) { // read children nodes : need more cycles
-            when (io.read_node) {
+            when (io.read_node && !io.write) {
                 current_node := node
                 mem_state_reg := mCycle2 // current_node valid
+            }.elsewhen (io.read_node && io.write) {
+                local_index = get_local_index(io.position_in, level)
+                io.node_out := node
+                current_node.position := token.position
+                current_node.value := token.op.push
+                memory.write(local_index, io.node_in.asUInt) // 提前修改position为1的结点
+                mem_state_reg := mCycle2
             }.elsewhen (io.read_children) {
                 left_node := left
-                val right = memory.read(local_index_reg + 1.U).asTypeOf(new Node(level))
+                right = memory.read(local_index_reg + 1.U).asTypeOf(new Node(level))
                 mem_state_reg := mCycle2
             }.otherwise {}
         }
@@ -91,6 +105,7 @@ class MemBlock (val level : Int,val mem_type : String) extends Module {
             io.pair_out.left_node := left_node
             io.pair_out.right_node := right
             when (io.write) {
+                local_index = get_local_index(io.position_in, level)
                 memory.write(local_index, io.node_in.asUInt)
             }
             mem_state_reg := mCycle0

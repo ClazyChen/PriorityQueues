@@ -19,7 +19,6 @@ object Func {
     def position_width (cur_level : Int) : Int = {
         cur_level
     }
-
     // 计算块内索引
     def get_local_index (global_index : Int, cur_level : Int) : Int = {
         global_index - (1 << (cur_level - 1)) + 1.U
@@ -67,13 +66,29 @@ object Func {
         node.capacity >= 1
     }
     // 用三个比较器来计算rank最低(优先级最高)的元素下标
-    // def get_lowest_position (signal_0 : Bool, signal_1 : Bool, 
-    // signal_2 : Bool, position : UInt) : UInt = {
-    //     // get_lowest_position(cmp_lc_rc, cmp_input_lc, cmp_input_rc, token.position)
-
-
-    // }
-
+    // val cmp_lc_rc = io.pair_in.left_node < io.pair_in.right_node
+    // val cmp_parent_lc = mem.io.node_out < io.pair_in.left_node
+    // val cmp_parent_rc = mem.io.node_out < io.pair_in.right_node
+    def get_lowest_position (cmp_lc_rc : Bool, cmp_parent_lc : Bool, 
+    cmp_parent_rc : Bool, position : UInt) : UInt = {
+        Mux(
+        // 情况1：父节点比左右子节点都小 → 直接选父节点
+            cmp_parent_lc && cmp_parent_rc,
+            position,
+            Mux(
+                // 情况2：父节点比左子节点小，但不比右子节点小 → 选右子节点
+                cmp_parent_lc,
+                get_rc_global_index(position)
+                Mux(
+                    // 情况3：父节点比右子节点小，但不比左子节点小 → 选左子节点
+                    cmp_parent_rc,
+                    get_lc_global_index(position)
+                    // 情况4：父节点不比任何子节点小 → 比较左右子节点，选更小的
+                    Mux(cmp_lc_rc, get_lc_global_index(position), get_rc_global_index(position))
+                )
+            )
+        )
+    }
     // 把count_of_entries转化成count_of_levels
     def generate_level (current_node_index : Int) : Int = {
         log2Ceil(current_node_index + 1.U)
