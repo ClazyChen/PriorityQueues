@@ -16,7 +16,7 @@ object BlackBox {
     val cold_start_ops = 3
 
     // number of operations in the test
-    val num_ops = 100
+    val num_ops = 200
 
     // push, pop, replace ratio
     val ratio = (0.6, 0.1, 0.3)

@@ -7,16 +7,13 @@ import fpga._
 import fpga.Const._
 import fpga.pheap.Param._
 
-// parent_pos 上->下
+
 // lc_node, rc_node 下->上
-// lc_pos, rc_pos可以由parent_pos计算得出，进而读取到node
 // cur_node根据token_in，在lc_node, rc_node中选取
 class RPU(val level: Int) extends Module {
     val io = IO(new Bundle {
         val token_in = Input(new TokenNode(level))
         val token_out = Output(new TokenNode(level + 1))
-        val parent_pos_in = Input(UInt(position_width(level - 1).W))
-        val cur_pos_out = Output(UInt(position_width(level).W))
         val lc_node_in = Input(new Node(level + 1))
         val rc_node_in = Input(new Node(level + 1))
         val left_node_out = Output(new Node(level))
@@ -26,7 +23,7 @@ class RPU(val level: Int) extends Module {
     val mem = Module(new Memory(level))
 
     // 应该对token_in和token_out进行区分
-    // token_in存储输入的io.token_in，因为io.token_in信号不稳定
+    // token_in存储输入的io.token_in，因为io.token_in信号不稳定，只在第一个周期输入
     // token_out对应于对下一级rpu的操作，需要根据token_in的信号来确定
     val token_in = RegInit(io.token_in)
     val token_out = RegInit(TokenNode.default(level))
@@ -39,20 +36,25 @@ class RPU(val level: Int) extends Module {
     val addr = pos2addr(level, token_in.position)
     val lc_pos = RegInit(get_lc_pos(io.token_in.position))
     val rc_pos = RegInit(get_rc_pos(io.token_in.position))
+
+    // 当前level读出的Pair中的两个节点
     val left_node = Wire(new Node(level))
     val right_node = Wire(new Node(level))
-    val left_pos = get_lc_pos(io.parent_pos_in)
-    val cur_node = Mux(left_pos === token_in.position, left_node, right_node)
+
+    // 根据token_in，判断当前节点位置
+    val cur_node = Mux(is_left(token_in.position), left_node, right_node)
+
+    // 临时存储当前level的节点
     val new_pair = Wire(new Pair(level))
     val new_node = Wire(new Node(level))
 
+    // 初始化
     new_pair := Pair.default(level)
     new_node := Node.default(level)
     idle()
 
     left_node := mem.io.pair_out.first
     right_node := mem.io.pair_out.second
-    io.cur_pos_out := token_in.position
     io.left_node_out := left_node
     io.right_node_out := right_node
     
@@ -121,7 +123,7 @@ class RPU(val level: Int) extends Module {
 
     // idle -> cycle0 接收到token，根据token读
     // cycle0 -> cycle1 读到结果，根据结果写，并更新token
-    // cycle1 -> idle token传到下一级，mem.idle
+    // cycle1 -> idle 准备好token，并进入idle状态
     // 如果在cycle1阶段将token传到下一级，那么在下一个周期
     // 当前rpu处于idle状态，下一级rpu处于cycle0状态
     val pass_down = RegInit(false.B)
@@ -153,6 +155,8 @@ class RPU(val level: Int) extends Module {
             } .otherwise {
                 local_enqueue()
             }
+
+            // 对当前level的节点进行更新
             when(is_left(token_in.position)) {
                 new_pair.first := new_node
                 new_pair.second := right_node
@@ -160,6 +164,8 @@ class RPU(val level: Int) extends Module {
                 new_pair.first := left_node
                 new_pair.second := new_node
             }
+
+            // write只在这个阶段进行
             write(addr, new_pair)
             state := sCycle1
         }
