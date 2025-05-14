@@ -7,14 +7,16 @@ import chisel3.util._
 
 object Const {
     // the number of levels in pheap
-    val pheap_level = log2Ceil(count_of_entries + 1)
+    val pheap_level = 8
 
     // the type of memory used in pheap
     val pheap_mem = "SRAM" 
 
     def capacity_width(level : Int) : Int = {
-        if (level <= pheap_level) {
-            pheap_level - level + 1
+        val p_level = if (pheap_level > 0) pheap_level else log2Ceil(count_of_entries + 1)
+
+        if (level <= p_level) {
+            p_level - level + 1
         } else {
             1 // UB
         }
@@ -22,7 +24,7 @@ object Const {
 
     def position_width(level : Int) : Int = level
 
-    def data_depth(level : Int) : Int = if (level > 1) level - 1 else 1
+    def data_depth(level : Int) : Int = if (level > 1) 1 << (level - 2) else 1
 
     def addr_width(level : Int) : Int = {
         val depth = data_depth(level)

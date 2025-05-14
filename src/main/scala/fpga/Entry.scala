@@ -20,9 +20,6 @@ class Entry extends Bundle {
         val replace = this < that
         (Mux(replace, this, that), Mux(replace, that, this))
     }
-
-    // no init flag
-    def no_init: Bool = this.asUInt === 0.U
 }
 
 // the default entry (invalid entry)

@@ -10,11 +10,9 @@ import fpga.pheap.Const._
 class PHeap extends Module with PriorityQueueTrait {
     val io = IO(new PQIO)
 
-    val RPUs = Seq.tabulate(pheap_level)(i => Module(new RPU(i + 1, pheap_mem)))
+    val level = if (pheap_level > 0) pheap_level else log2Ceil(count_of_entries + 1)
 
-    // 启动信号，根据操作是否有效
-    val enable            = io.op_in.push.existing | io.op_in.pop
-    RPUs(0).io.enable_in := enable
+    val RPUs = Seq.tabulate(level)(i => Module(new RPU(i + 1, pheap_mem)))
 
     // token输入
     val token            = Wire(new Token(1))
@@ -26,16 +24,13 @@ class PHeap extends Module with PriorityQueueTrait {
     RPUs(0).io.read_in      := false.B
     RPUs(0).io.read_addr_in := DontCare
 
-    // pop/replace输出，输入之后的第二个周期产生输出
-    // 而sr,sa 输出放在第一个block，所以提前产生了
-    // 这里也可以考虑第一层用寄存器存放，这样就可以早点输出了
-    val entry     = RPUs(0).io.entry_out.getOrElse(DontCare)
-    io.entry_out := entry
+    // pop/replace输出，在信号输入时，data out就是根节点的最新数据
+    io.entry_out := RPUs(0).io.data_out.asTypeOf(Vec(2, new Node(1)))(1).entry
 
     // connect RPUs one by one
-    for (i <- 0 until pheap_level - 1) {
+    for (i <- 0 until level - 1) {
         RPUs(i) ~> RPUs(i + 1)
     }
     
-    RPUs.last.io.read_dual_node_in := VecInit(Seq.fill(2)(Node.default(pheap_level + 1))).asUInt
+    RPUs.last.io.next_data_in := VecInit(Seq.fill(2)(Node.default(level + 1))).asUInt
 }
