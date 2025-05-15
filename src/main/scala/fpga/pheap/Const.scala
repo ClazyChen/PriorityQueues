@@ -10,7 +10,7 @@ object Const {
     val pheap_level = 8
 
     // the type of memory used in pheap
-    val pheap_mem = "SRAM" 
+    val pheap_mem = "FFMEM" 
 
     def capacity_width(level : Int) : Int = {
         val p_level = if (pheap_level > 0) pheap_level else log2Ceil(count_of_entries + 1)

@@ -57,7 +57,9 @@ object BlackBox {
         pq.io.op_in.pop.poke(true.B)
         pq.clock.step()
         idle(5)
-        std_pq.dequeue()
+        if (!std_pq.isEmpty) {
+            std_pq.dequeue()
+        }
     }
 
     // replace the top entry with a new entry

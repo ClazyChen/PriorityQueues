@@ -23,6 +23,9 @@ class RPU(val level : Int, use_mem : String) extends Module {
         val read_in             = Input(Bool())
         val read_addr_in        = Input(UInt( addr_width(level).W ))
         val data_out            = Output(UInt(rw_width(level).W))    
+
+       // val debug = Input(Bool())
+        val debug_port = if (debug) Some(Output(Vec(data_depth(level), Vec(2, new Node(level))))) else None
     })
 
     // 定义状态
@@ -39,6 +42,13 @@ class RPU(val level : Int, use_mem : String) extends Module {
         case _       => Module(new SinglePortSram(depth, width))
     } 
     mem.idle() // 默认值
+
+    // debug mem
+    val debug_mem = if (debug) Some(RegInit(VecInit(Seq.fill(depth)(VecInit(Seq.fill(2)(Node.default(level)))))))
+        else None
+    if (debug) {
+        io.debug_port.get := debug_mem.get
+    }
 
     // reg
     val data = RegInit(0.U(rw_width(level).W))
@@ -115,9 +125,23 @@ class RPU(val level : Int, use_mem : String) extends Module {
                 addr := token.position.tail(1) >> 1
             }
             mem.write(addr, data)
+
+            if (debug) {
+                debug_mem.get(addr)  := data.asTypeOf(Vec(2, new Node(level)))
+            }
             state := read
         }
     }
+
+    // when (io.debug) {
+    //     printf(p"level:$level ")
+    //     for (i <- 0 until depth) {
+    //         for (j <- 0 until 2) {
+    //             printf(p"${i * 2 + j} = 0x${Hexadecimal(debug_mem.get(i)(j).entry.rank)} ")
+    //         }
+    //     }
+    //     printf(p"\n")
+    // }
     
     // connect RPUs, this ~> next
     def ~>(next: RPU) = {

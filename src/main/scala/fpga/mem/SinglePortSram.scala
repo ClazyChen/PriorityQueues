@@ -18,6 +18,8 @@ class SinglePortSram(
     val mem = SyncReadMem(data_depth, UInt(data_width.W))
 
     io.data_out := DontCare
+
+    // data_out是wire类型，en有效的时候，data_out同时有效，为啥会延迟一个周期？
     when (io.en) {
         val port = mem(io.addr)
         when (io.wen) {
