@@ -59,9 +59,7 @@ class Memory(
         val done = RegInit(false.B)
 
         when (!done) {
-            // 按照 cnt 从 init_vec 中读取常量，写到 mem 中
             mem.write(cnt, io.pair_in.asUInt)
-            // printf(p"Writing level=$level, cnt=$cnt, c=${io.pair_in.asUInt.asTypeOf(new Pair(level)).first.capacity}\n")
             cnt := cnt + 1.U
             when (cnt === (depth-1).U) {
                 done := true.B

@@ -49,6 +49,7 @@ object Pair {
 
 
 class TokenNode(val level: Int) extends Bundle {
+    val active   = Bool()
     val op       = new Operator
     val position = UInt(position_width(level).W)
 }
@@ -56,6 +57,7 @@ class TokenNode(val level: Int) extends Bundle {
 object TokenNode {
     def default(level: Int): TokenNode = {
         val token_node = Wire(new TokenNode(level))
+        token_node.active := false.B
         token_node.op := Operator.nop
         token_node.position := 0.U
         token_node

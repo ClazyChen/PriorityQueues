@@ -31,8 +31,14 @@ object Param {
 
     def get_rc_pos(parent_pos: UInt): UInt = 2.U * parent_pos + 1.U
 
-    // 这里采用移码，1代表0
-    def is_empty_node(node: Node) = node.capacity === 1.U
+    def actual_capacity(node: Node) = node.capacity - 1.U
+
+    def is_empty_node(node: Node) = actual_capacity(node) === 0.U
+
+    def larger_capacity(node1: Node, node2: Node) = {
+        Mux(actual_capacity(node1) > actual_capacity(node2), node1.capacity, node2.capacity)
+    }
+
 
     val use_sram_param = true
 

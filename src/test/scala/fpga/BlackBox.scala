@@ -16,10 +16,10 @@ object BlackBox {
     val cold_start_ops = 3
 
     // number of operations in the test
-    val num_ops = 200
+    val num_ops = 50
 
     // push, pop, replace ratio
-    val ratio = (0.6, 0.1, 0.3)
+    val ratio = (0.4, 0.3, 0.4)
     val op_nop = -1
     val op_push = 0
     val op_pop = 1
@@ -34,19 +34,12 @@ object BlackBox {
     // random seed
     val seed = 1234567890
 
-    def debug_print[PQ <: PriorityQueueTrait](tag: String)(implicit pq: PQ): Unit = {
-        val entries = pq.io.dbg_port.get.map(_.rank.peek().litValue)
-        println(f"${tag}%-8s: ${entries.mkString("[", ", ", "]")}")
-
-    }
-
     def nop[PQ <: PriorityQueueTrait](implicit pq: PQ, std_pq: PriorityQueue[(Int, Int)]): Unit = {
         pq.io.op_in.push.existing.poke(false.B)
         pq.io.op_in.push.rank.poke(-1.S(rank_width.W).asUInt)
         pq.io.op_in.push.metadata.poke(0.U)
         pq.io.op_in.pop.poke(false.B)
         pq.clock.step()
-        if(debug) debug_print("nop")
     }
 
     // push a new entry into the priority queue
@@ -55,9 +48,8 @@ object BlackBox {
         pq.io.op_in.push.rank.poke(rank.U)
         pq.io.op_in.push.metadata.poke(metadata.U)
         pq.io.op_in.pop.poke(false.B)
-        pq.clock.step(3)
+        pq.clock.step()
         std_pq.enqueue((rank, metadata))
-        if(debug) debug_print(s"push(${rank})")
     }
 
     // pop the top entry from the priority queue
@@ -66,9 +58,8 @@ object BlackBox {
         pq.io.op_in.push.rank.poke(-1.S(rank_width.W).asUInt)
         pq.io.op_in.push.metadata.poke(0.U)
         pq.io.op_in.pop.poke(true.B)
-        pq.clock.step(3)
+        pq.clock.step()
         std_pq.dequeue()
-        if(debug) debug_print("pop")
     }
 
     // replace the top entry with a new entry
@@ -80,7 +71,6 @@ object BlackBox {
         pq.clock.step()
         std_pq.enqueue((rank, metadata))
         std_pq.dequeue()
-        if(debug) debug_print(s"rep(${rank})")
     }
 
     // check the top entry of the priority queue
@@ -107,17 +97,18 @@ object BlackBox {
     }
 
     def pheap_ops(): Array[Int] = {
-        val ops = Array.fill(num_ops)(to_op(random.nextDouble()))
-        ops.zipWithIndex.flatMap { case (op, idx) =>
-            Array(op, op_nop, op_nop)
-        }
+        val base_ops = Array.fill(num_ops)(to_op(random.nextDouble()))
+        base_ops.flatMap(op => Array(op) ++ Array.fill(5)(op_nop))
     }
+
+
 
     // the test body
     def test_black_box[PQ <: PriorityQueueTrait](c: PQ, test_ops: Array[Int]): Unit = {
         // generate the cold start numbers and the test numbers
         val cold_start_nums = Array.fill(cold_start_ops)(random.nextInt(1 << rank_width))
-        val test_nums = Array.fill(num_ops)(random.nextInt(1 << rank_width))
+        val test_data_ops = test_ops.count(op => op == op_push || op == op_replace)
+        val test_nums = Array.fill(test_data_ops)(random.nextInt(1 << rank_width))
 
         // the built-in priority queue to check the result, and the priority queue to test
         // lazy implicit val std_pq = new PriorityQueue[(Int, Int)]()(Ordering.by((x: (Int, Int)) => (x._1, x._2)).reverse)
@@ -125,29 +116,49 @@ object BlackBox {
         lazy implicit val std_pq = new PriorityQueue[(Int, Int)]()(Ordering.by((x: (Int, Int)) => (x._1, x._2)))
         lazy implicit val pq = c
 
-        // TODO 给时间完成初始化
-        // pq.clock.step(4)
         pq.clock.step(get_pair_depth(count_of_levels))
-
 
         // initialize the priority queue
         cold_start_nums.zipWithIndex.foreach { case (rank, metadata) =>
             push(rank, metadata)
+            (0 until 5).foreach(_ => nop)
         }
 
         // start the test
         check_top
 
         // test the priority queue
-        test_ops.zipWithIndex.foreach { case (op, i) =>
-            op match {
-                case `op_nop` => nop
-                case `op_push` => push(test_nums(i), i)
-                case `op_pop` => pop
-                case `op_replace` => replace(test_nums(i), i)
-            }
-            // check_top
-        }
+        // test_ops.zipWithIndex.foreach { case (op, i) =>
+        //     op match {
+        //         case `op_nop` => nop
+        //         case `op_push` => push(test_nums(i), i)
+        //         case `op_pop` => pop
+        //         case `op_replace` => replace(test_nums(i), i)
+        //     }
+        //     check_top
+        // }
 
+        var data_idx = 0
+
+        test_ops.foreach { op =>
+            op match {
+                case `op_nop` =>
+                    nop
+
+                case `op_push` =>
+                    check_top
+                    push(test_nums(data_idx), data_idx)
+                    data_idx += 1
+
+                case `op_replace` =>
+                    check_top
+                    replace(test_nums(data_idx), data_idx)
+                    data_idx += 1
+
+                case `op_pop` =>
+                    check_top
+                    pop
+            }
+        }
     }
 }

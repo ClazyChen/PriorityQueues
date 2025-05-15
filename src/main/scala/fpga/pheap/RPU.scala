@@ -8,16 +8,12 @@ import fpga.Const._
 import fpga.pheap.Param._
 
 
-// lc_node, rc_node 下->上
-// cur_node根据token_in，在lc_node, rc_node中选取
 class RPU(val level: Int) extends Module {
     val io = IO(new Bundle {
         val token_in = Input(new TokenNode(level))
         val token_out = Output(new TokenNode(level + 1))
-        val lc_node_in = Input(new Node(level + 1))
-        val rc_node_in = Input(new Node(level + 1))
-        val left_node_out = Output(new Node(level))
-        val right_node_out = Output(new Node(level))
+        val pair_in = Input(new Pair(level + 1))
+        val pair_out = Output(new Pair(level))
     })
     // mem初始化需要get_pair_depth个周期，写入空pair
     val mem = Module(new Memory(level))
@@ -26,23 +22,24 @@ class RPU(val level: Int) extends Module {
     // token_in存储输入的io.token_in，因为io.token_in信号不稳定，只在第一个周期输入
     // token_out对应于对下一级rpu的操作，需要根据token_in的信号来确定
     val token_in = RegInit(io.token_in)
-    val token_out = RegInit(TokenNode.default(level))
+    val token_out = RegInit(TokenNode.default(level + 1))
     
     // token_out只在cycle1状态进行输出，其他状态不输出
     // 也就是说，除了level1,其他level的token_in信号都只能在idle状态下接收到
     // 在下一个状态，token_in信号将变成无效值
-    io.token_out := TokenNode.default(level)
+    io.token_out := TokenNode.default(level + 1)
 
     val addr = pos2addr(level, token_in.position)
     val lc_pos = RegInit(get_lc_pos(io.token_in.position))
     val rc_pos = RegInit(get_rc_pos(io.token_in.position))
 
-    // 当前level读出的Pair中的两个节点
-    val left_node = Wire(new Node(level))
-    val right_node = Wire(new Node(level))
+    // 当前level读出的Pair
+    val cur_pair = Wire(new Pair(level))
+    cur_pair := mem.io.pair_out
+    io.pair_out := cur_pair
 
     // 根据token_in，判断当前节点位置
-    val cur_node = Mux(is_left(token_in.position), left_node, right_node)
+    val cur_node = Mux(is_left(token_in.position), cur_pair.first, cur_pair.second)
 
     // 临时存储当前level的节点
     val new_pair = Wire(new Pair(level))
@@ -52,66 +49,64 @@ class RPU(val level: Int) extends Module {
     new_pair := Pair.default(level)
     new_node := Node.default(level)
     idle()
-
-    left_node := mem.io.pair_out.first
-    right_node := mem.io.pair_out.second
-    io.left_node_out := left_node
-    io.right_node_out := right_node
     
-    // 用2个比较器加快local_enqueue_dequeue
-    val cmp_token_lc = io.lc_node_in.entry > token_in.op.push
-    val cmp_token_rc = io.rc_node_in.entry > token_in.op.push
-    val cmp_lc_rc = io.rc_node_in.entry > io.lc_node_in.entry
+    
+    // 用3个比较器加快local_enqueue_dequeue
+    val cmp_token_lc = io.pair_in.first.entry > token_in.op.push
+    val cmp_token_rc = io.pair_in.second.entry > token_in.op.push
+    val cmp_lc_rc = io.pair_in.second.entry > io.pair_in.first.entry
 
     def local_enqueue() = {
-        val cur_capacity = cur_node.capacity - 1.U
-        when (!cur_node.entry.existing) {
+        // val cur_capacity = cur_node.capacity - 1.U
+        val cur_capacity = Mux(is_empty_node(cur_node), cur_node.capacity, cur_node.capacity - 1.U)
+        when (!cur_node.entry.existing) { // 如果当前节点不存在，则直接插入
             new_node := Node.init(level, token_in.op.push, cur_capacity)
             token_out.op := Operator.nop
-        } .elsewhen (cur_node.entry > token_in.op.push) {
+        } .elsewhen (cur_node.entry > token_in.op.push) { // 当前节点更大，token_in传到下一层
             new_node := Node.init(level, cur_node.entry, cur_capacity)
             token_out.op.push := token_in.op.push
-        } .otherwise {
+            token_out.op.pop := token_in.op.pop
+        } .otherwise { // 当前节点更小，当前节点传到下一层
             new_node := Node.init(level, token_in.op.push, cur_capacity)
             token_out.op.push := cur_node.entry
+            token_out.op.pop := token_in.op.pop
         }
- 
-        token_out.position := Mux(is_empty_node(io.lc_node_in), rc_pos, lc_pos)
+        // 左孩子不为空，则传到左孩子
+        val lc_empty = is_empty_node(io.pair_in.first)
+        token_out.position := Mux(lc_empty, rc_pos, lc_pos)
     }
 
     def local_dequeue() = {
-        // 论文里说Increment B[k].capacity, 我感觉不合理
-        // 这里实现的是仅增加当前层Node的capacity
         val cur_capacity = cur_node.capacity + 1.U
-        when (!io.lc_node_in.entry.existing && !io.rc_node_in.entry.existing) {
+        when (!io.pair_in.first.entry.existing && !io.pair_in.second.entry.existing) {
+            // 如果两个孩子都不存在，当前节点变成空节点
             new_node := Node.init(level, Entry.default, cur_capacity)
             token_out.op := Operator.nop
         } .otherwise {
-            when(io.rc_node_in.entry > io.lc_node_in.entry) {
-                new_node := Node.init(level, io.rc_node_in.entry, cur_capacity)     
+            // 否则，将更大的孩子写入当前节点
+            token_out.op := token_in.op
+            when(io.pair_in.second.entry > io.pair_in.first.entry) {
+                new_node := Node.init(level, io.pair_in.second.entry, cur_capacity)  
                 token_out.position := rc_pos
             } .otherwise {
-                new_node := Node.init(level, io.lc_node_in.entry, cur_capacity)    
+                new_node := Node.init(level, io.pair_in.first.entry, cur_capacity)    
                 token_out.position := lc_pos
             }
         }
     }
 
     def local_enqueue_dequeue() = {
-        when (!io.lc_node_in.entry.existing && !io.rc_node_in.entry.existing) {
-            // 这里的实现与原文不同
-            // 三角形中包括token, lc_node, rc_node
-            // 因为在根节点cur_node与V比较完之后,并不能在外部马上将结果写入
-            // 所以只能先用token将比较结果传进RPU
-            new_node := Node.init(level, token_in.op.push, get_capacity(level) - 1.U)
+        when (!io.pair_in.first.entry.existing && !io.pair_in.second.entry.existing) {
+            new_node := Node.init(level, token_in.op.push, cur_node.capacity)
             token_out.op := Operator.nop
         } .otherwise {
             when (!cmp_token_lc && !cmp_token_rc) {
-                new_node := Node.init(level, token_in.op.push, get_capacity(level) - 1.U)
+                new_node := Node.init(level, token_in.op.push, cur_node.capacity)
                 token_out.op := Operator.nop
             } .otherwise {
-                new_node := Mux(cmp_lc_rc, io.rc_node_in, io.lc_node_in)
-                token_out.op.push := cur_node.entry
+                new_node := Mux(cmp_lc_rc, io.pair_in.second, io.pair_in.first)
+                new_node.capacity := cur_node.capacity
+                token_out.op := token_in.op
                 token_out.position := Mux(cmp_lc_rc, rc_pos, lc_pos)
             }
         }
@@ -129,20 +124,28 @@ class RPU(val level: Int) extends Module {
     val pass_down = RegInit(false.B)
     switch(state) {
         is(sIdle) {
+            // cur_pair接到mem的输出上, read后的下一个周期获取到输出
+            read(addr)
+            when(io.token_in.active) {
+                token_in.position := io.token_in.position
+            }
             when(io.token_in.op.pop || io.token_in.op.push.existing) {
                 token_in := io.token_in
-                token_out := io.token_in
                 lc_pos := get_lc_pos(io.token_in.position)
                 rc_pos := get_rc_pos(io.token_in.position)
-                // left_node, right_node接到mem的输出上, read后的下一个周期获取到输出
-                read(addr)
                 state := sCycle0
             }
-            when (pass_down) {
+            when (pass_down) { // 刚完成一个操作
                 io.token_out := token_out
                 pass_down := false.B
-            } .otherwise {
-                io.token_out := TokenNode.default(level) 
+            } .elsewhen(io.token_in.op.pop || io.token_in.op.push.existing) {
+                // 即将开始一个操作,读取子节点
+                val nop_token = TokenNode.default(level + 1)
+                nop_token.active := true.B
+                nop_token.position := get_lc_pos(io.token_in.position)
+                io.token_out := nop_token
+            }. otherwise {  // 空闲
+                io.token_out := TokenNode.default(level + 1)
             }
         }
         is(sCycle0) {
@@ -159,9 +162,9 @@ class RPU(val level: Int) extends Module {
             // 对当前level的节点进行更新
             when(is_left(token_in.position)) {
                 new_pair.first := new_node
-                new_pair.second := right_node
+                new_pair.second := cur_pair.second
             }.otherwise {
-                new_pair.first := left_node
+                new_pair.first := cur_pair.first
                 new_pair.second := new_node
             }
 
