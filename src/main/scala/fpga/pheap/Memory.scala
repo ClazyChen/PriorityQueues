@@ -59,7 +59,7 @@ class Memory(
         val done = RegInit(false.B)
 
         when (!done) {
-            mem.write(cnt, io.pair_in.asUInt)
+            mem.write(cnt, Pair.default(level).asUInt)
             cnt := cnt + 1.U
             when (cnt === (depth-1).U) {
                 done := true.B

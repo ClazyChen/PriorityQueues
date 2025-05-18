@@ -42,12 +42,12 @@ class RPU(val level: Int) extends Module {
     val cur_node = Mux(is_left(token_in.position), cur_pair.first, cur_pair.second)
 
     // 临时存储当前level的节点
-    val new_pair = Wire(new Pair(level))
-    val new_node = Wire(new Node(level))
+    val new_pair = RegInit(Pair.default(level))
+    val new_node = WireInit(Node.default(level))
 
     // 初始化
-    new_pair := Pair.default(level)
-    new_node := Node.default(level)
+    // new_pair := Pair.default(level)
+    // new_node := Node.default(level)
     idle()
     
     
@@ -55,14 +55,14 @@ class RPU(val level: Int) extends Module {
     val cmp_token_lc = io.pair_in.first.entry > token_in.op.push
     val cmp_token_rc = io.pair_in.second.entry > token_in.op.push
     val cmp_lc_rc = io.pair_in.second.entry > io.pair_in.first.entry
+    val cmp_token_cur = cur_node.entry > token_in.op.push
 
     def local_enqueue() = {
-        // val cur_capacity = cur_node.capacity - 1.U
         val cur_capacity = Mux(is_empty_node(cur_node), cur_node.capacity, cur_node.capacity - 1.U)
         when (!cur_node.entry.existing) { // 如果当前节点不存在，则直接插入
             new_node := Node.init(level, token_in.op.push, cur_capacity)
             token_out.op := Operator.nop
-        } .elsewhen (cur_node.entry > token_in.op.push) { // 当前节点更大，token_in传到下一层
+        } .elsewhen (cmp_token_cur) { // 当前节点更大，token_in传到下一层
             new_node := Node.init(level, cur_node.entry, cur_capacity)
             token_out.op.push := token_in.op.push
             token_out.op.pop := token_in.op.pop
@@ -85,7 +85,7 @@ class RPU(val level: Int) extends Module {
         } .otherwise {
             // 否则，将更大的孩子写入当前节点
             token_out.op := token_in.op
-            when(io.pair_in.second.entry > io.pair_in.first.entry) {
+            when(cmp_lc_rc) {
                 new_node := Node.init(level, io.pair_in.second.entry, cur_capacity)  
                 token_out.position := rc_pos
             } .otherwise {
@@ -125,11 +125,13 @@ class RPU(val level: Int) extends Module {
     switch(state) {
         is(sIdle) {
             // cur_pair接到mem的输出上, read后的下一个周期获取到输出
-            read(addr)
+            // read(addr) token_in在下一个周期才完成更新，读取到mem的输出还需要一个周期
+            read(pos2addr(level, io.token_in.position))
+            val start = io.token_in.op.pop || io.token_in.op.push.existing
             when(io.token_in.active) {
                 token_in.position := io.token_in.position
             }
-            when(io.token_in.op.pop || io.token_in.op.push.existing) {
+            when(start) {
                 token_in := io.token_in
                 lc_pos := get_lc_pos(io.token_in.position)
                 rc_pos := get_rc_pos(io.token_in.position)
@@ -138,7 +140,7 @@ class RPU(val level: Int) extends Module {
             when (pass_down) { // 刚完成一个操作
                 io.token_out := token_out
                 pass_down := false.B
-            } .elsewhen(io.token_in.op.pop || io.token_in.op.push.existing) {
+            } .elsewhen(start) {
                 // 即将开始一个操作,读取子节点
                 val nop_token = TokenNode.default(level + 1)
                 nop_token.active := true.B
@@ -149,6 +151,7 @@ class RPU(val level: Int) extends Module {
             }
         }
         is(sCycle0) {
+            read(addr)
             when (token_in.op.pop) {
                 when(token_in.op.push.existing) {
                     local_enqueue_dequeue()
@@ -168,13 +171,14 @@ class RPU(val level: Int) extends Module {
                 new_pair.second := new_node
             }
 
-            // write只在这个阶段进行
-            write(addr, new_pair)
+            
             state := sCycle1
         }
         is(sCycle1) {
+            // write只在这个阶段进行
+            write(addr, new_pair)
             pass_down := true.B
-            idle()
+            // idle()
             state := sIdle
         }
     }

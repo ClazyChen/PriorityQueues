@@ -24,11 +24,11 @@ object Node {
     def default(level : Int): Node = {
         val node       = Wire(new Node(level))
         node.entry    := Entry.default
-        node.capacity := 0.S(capacity_width(level).W).asUInt
+        node.capacity := get_capacity(level).asUInt
         node
     }
 
-    def getWidth(level : Int): Int = (new Node(level)).getWidth
+    def get_width(level : Int): Int = (new Node(level)).getWidth
 
 }
 

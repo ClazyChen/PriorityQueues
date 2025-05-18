@@ -11,15 +11,15 @@ object Param {
 
     val count_of_levels = get_level()
 
-    def get_capacity(level: Int): UInt = (1 << (count_of_levels + 1 - level)).U
-
     def capacity_width(level: Int) = count_of_levels + 1 - level
+    
+    def get_capacity(level: Int) = -1.S(capacity_width(level).W).asUInt
 
     def position_width(level: Int) = if(level <= 1) 1 else level - 1
 
     // memory一次性读写2个节点
     def get_pair_depth(level: Int) = if(level <= 1) 1 else 1 << (level - 2)
-    def get_pair_width(level: Int) = 2 * Node.getWidth(level)
+    def get_pair_width(level: Int) = 2 * Node.get_width(level)
 
     def get_addr_width(level: Int) = if(level <= 2) 1 else 1 << (level - 3)
 
@@ -27,9 +27,9 @@ object Param {
 
     def is_left(pos: UInt): Bool = pos % 2.U === 0.U
                 
-    def get_lc_pos(parent_pos: UInt): UInt = 2.U * parent_pos
+    def get_lc_pos(parent_pos: UInt): UInt = Cat(parent_pos, 0.U(1.W))
 
-    def get_rc_pos(parent_pos: UInt): UInt = 2.U * parent_pos + 1.U
+    def get_rc_pos(parent_pos: UInt): UInt = Cat(parent_pos, 1.U(1.W))
 
     def actual_capacity(node: Node) = node.capacity - 1.U
 
@@ -38,7 +38,6 @@ object Param {
     def larger_capacity(node1: Node, node2: Node) = {
         Mux(actual_capacity(node1) > actual_capacity(node2), node1.capacity, node2.capacity)
     }
-
 
     val use_sram_param = true
 

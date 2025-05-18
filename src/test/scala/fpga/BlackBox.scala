@@ -16,7 +16,7 @@ object BlackBox {
     val cold_start_ops = 3
 
     // number of operations in the test
-    val num_ops = 50
+    val num_ops = 100
 
     // push, pop, replace ratio
     val ratio = (0.4, 0.3, 0.4)
@@ -32,7 +32,7 @@ object BlackBox {
     }
 
     // random seed
-    val seed = 1234567890
+    val seed = 1234567891
 
     def nop[PQ <: PriorityQueueTrait](implicit pq: PQ, std_pq: PriorityQueue[(Int, Int)]): Unit = {
         pq.io.op_in.push.existing.poke(false.B)
