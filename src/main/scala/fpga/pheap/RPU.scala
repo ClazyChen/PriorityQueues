@@ -23,6 +23,10 @@ class RPU(val level: Int) extends Module {
     // token_out对应于对下一级rpu的操作，需要根据token_in的信号来确定
     val token_in = RegInit(io.token_in)
     val token_out = RegInit(TokenNode.default(level + 1))
+
+    // ffmem在当个周期就能读出数据，下一个周期数据就消失了
+    // sram读取本身就会延迟一个周期才能获取到数据
+    val pair_in = if(use_sram_param) WireInit(io.pair_in) else RegInit(io.pair_in)
     
     // token_out只在cycle1状态进行输出，其他状态不输出
     // 也就是说，除了level1,其他level的token_in信号都只能在idle状态下接收到
@@ -52,13 +56,13 @@ class RPU(val level: Int) extends Module {
     
     
     // 用3个比较器加快local_enqueue_dequeue
-    val cmp_token_lc = io.pair_in.first.entry > token_in.op.push
-    val cmp_token_rc = io.pair_in.second.entry > token_in.op.push
-    val cmp_lc_rc = io.pair_in.second.entry > io.pair_in.first.entry
+    val cmp_token_lc = pair_in.first.entry > token_in.op.push
+    val cmp_token_rc = pair_in.second.entry > token_in.op.push
+    val cmp_lc_rc = pair_in.second.entry > pair_in.first.entry
     val cmp_token_cur = cur_node.entry > token_in.op.push
 
     def local_enqueue() = {
-        val cur_capacity = Mux(is_empty_node(cur_node), cur_node.capacity, cur_node.capacity - 1.U)
+        val cur_capacity = Mux(is_full_node(cur_node), cur_node.capacity, cur_node.capacity - 1.U)
         when (!cur_node.entry.existing) { // 如果当前节点不存在，则直接插入
             new_node := Node.init(level, token_in.op.push, cur_capacity)
             token_out.op := Operator.nop
@@ -71,14 +75,14 @@ class RPU(val level: Int) extends Module {
             token_out.op.push := cur_node.entry
             token_out.op.pop := token_in.op.pop
         }
-        // 左孩子不为空，则传到左孩子
-        val lc_empty = is_empty_node(io.pair_in.first)
-        token_out.position := Mux(lc_empty, rc_pos, lc_pos)
+        // 左孩子未满，则传到左孩子
+        val lc_full = is_full_node(pair_in.first)
+        token_out.position := Mux(lc_full, rc_pos, lc_pos)
     }
 
     def local_dequeue() = {
         val cur_capacity = cur_node.capacity + 1.U
-        when (!io.pair_in.first.entry.existing && !io.pair_in.second.entry.existing) {
+        when (!pair_in.first.entry.existing && !pair_in.second.entry.existing) {
             // 如果两个孩子都不存在，当前节点变成空节点
             new_node := Node.init(level, Entry.default, cur_capacity)
             token_out.op := Operator.nop
@@ -86,17 +90,17 @@ class RPU(val level: Int) extends Module {
             // 否则，将更大的孩子写入当前节点
             token_out.op := token_in.op
             when(cmp_lc_rc) {
-                new_node := Node.init(level, io.pair_in.second.entry, cur_capacity)  
+                new_node := Node.init(level, pair_in.second.entry, cur_capacity)  
                 token_out.position := rc_pos
             } .otherwise {
-                new_node := Node.init(level, io.pair_in.first.entry, cur_capacity)    
+                new_node := Node.init(level, pair_in.first.entry, cur_capacity)    
                 token_out.position := lc_pos
             }
         }
     }
 
     def local_enqueue_dequeue() = {
-        when (!io.pair_in.first.entry.existing && !io.pair_in.second.entry.existing) {
+        when (!pair_in.first.entry.existing && !pair_in.second.entry.existing) {
             new_node := Node.init(level, token_in.op.push, cur_node.capacity)
             token_out.op := Operator.nop
         } .otherwise {
@@ -104,7 +108,7 @@ class RPU(val level: Int) extends Module {
                 new_node := Node.init(level, token_in.op.push, cur_node.capacity)
                 token_out.op := Operator.nop
             } .otherwise {
-                new_node := Mux(cmp_lc_rc, io.pair_in.second, io.pair_in.first)
+                new_node := Mux(cmp_lc_rc, pair_in.second, pair_in.first)
                 new_node.capacity := cur_node.capacity
                 token_out.op := token_in.op
                 token_out.position := Mux(cmp_lc_rc, rc_pos, lc_pos)
@@ -133,6 +137,7 @@ class RPU(val level: Int) extends Module {
             }
             when(start) {
                 token_in := io.token_in
+                pair_in := io.pair_in
                 lc_pos := get_lc_pos(io.token_in.position)
                 rc_pos := get_rc_pos(io.token_in.position)
                 state := sCycle0

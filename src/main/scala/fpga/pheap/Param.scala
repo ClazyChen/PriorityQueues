@@ -33,7 +33,7 @@ object Param {
 
     def actual_capacity(node: Node) = node.capacity - 1.U
 
-    def is_empty_node(node: Node) = actual_capacity(node) === 0.U
+    def is_full_node(node: Node) = actual_capacity(node) === 0.U
 
     def larger_capacity(node1: Node, node2: Node) = {
         Mux(actual_capacity(node1) > actual_capacity(node2), node1.capacity, node2.capacity)
