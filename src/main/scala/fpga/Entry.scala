@@ -24,6 +24,7 @@ object Entry {
         entry.rank := -1.S(rank_width.W).asUInt // -1 is the lowest priority
         entry
     }
+    def getWidth: Int = (new Entry).getWidth
 }
 
 // an operator for the priority queue

@@ -12,7 +12,7 @@ class ReadPort(
     val addr_width: Int,
     val data_width: Int,
 ) extends Bundle {
-    val en = Input(Bool())  // how to deal with signal 'en' ? 
+    val en = Input(Bool()) 
     val addr = Input(UInt(addr_width.W))
     val data = Output(UInt(data_width.W))
 }

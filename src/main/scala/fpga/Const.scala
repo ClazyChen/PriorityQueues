@@ -13,7 +13,4 @@ object Const {
     // the width of the rank
     val rank_width = 16;
 
-    // number of levels in the priority queue
-    val count_of_levels = 4;
-
 }
