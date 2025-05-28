@@ -10,7 +10,7 @@ import fpga.Const._
 object Func {
 
     // pheap parameters
-    val count_of_levels = 8
+    val count_of_levels = 4  
     val mem_type = "SRAM"
 
     // count_of_entries -> count_of_levels
@@ -24,15 +24,15 @@ object Func {
 
     def position_width (cur_level : Int) : Int = cur_level
 
-    // number of nodes
-    def data_depth (cur_level : Int) : Int = 1 << (cur_level - 1)
+    def data_depth (cur_level : Int) : Int = if (cur_level != 1) 1 << (cur_level - 2) else 1 
 
     def addr_width (cur_level : Int) : Int = {
-        if (cur_level == 1) {
+        val depth = data_depth(cur_level)
+        if (depth == 1) {
             1
         }
         else {
-            log2Ceil(data_depth(cur_level))
+            log2Ceil(depth)
         }
     }
 

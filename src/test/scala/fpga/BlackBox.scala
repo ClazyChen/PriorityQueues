@@ -35,7 +35,7 @@ object BlackBox {
     def idle[PQ <: PriorityQueueTrait](cycles : Int)(implicit pq: PQ): Unit = {
         pq.io.op_in.push.existing.poke(false.B)
         pq.io.op_in.push.rank.poke(-1.S(rank_width.W).asUInt)
-        pq.io.op_in.push.metadata.poke(0.U)
+        pq.io.op_in.push.metadata.poke(0.U(metadata_width.W))
         pq.io.op_in.pop.poke(false.B)
         pq.clock.step(cycles)
     }

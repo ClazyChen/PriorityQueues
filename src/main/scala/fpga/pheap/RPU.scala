@@ -46,7 +46,7 @@ class RPU (val level : Int) extends Module {
     io.token_out := Token.default(level + 1)
     io.read_next_out := false.B
     io.read_next_addr_out := DontCare
-    io.data_out := Pair.default(level).asUInt
+    io.data_out := data_reg.asUInt
 
     // mem初始化
     mem.io.read := false.B
