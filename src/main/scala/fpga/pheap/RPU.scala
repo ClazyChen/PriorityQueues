@@ -4,6 +4,7 @@ import scala._
 import chisel3._
 import chisel3.util._
 import fpga._
+import fpga.mem._
 import fpga.Const._
 import fpga.pheap.Node._
 import fpga.pheap.Func._
@@ -17,84 +18,103 @@ class RPU (val level : Int) extends Module {
         // read data from next level
         val read_next_out = Output(Bool())
         val read_next_addr_out = Output(UInt(addr_width(level + 1).W))
-        val next_data_in = Input(UInt(Pair.getWidth(level + 1).W))
+        val next_data_in = Input(UInt(pair_width(level + 1).W))
 
         // receive signals from prev RPU
         val read_in = Input(Bool())
         val read_addr_in = Input(UInt(addr_width(level).W))
-        val data_out = Output(UInt(Pair.getWidth(level).W))
+        val data_out = Output(UInt(pair_width(level).W))
     })
     
+    // regs
     val token = RegInit(Token.default(level))
     val token_next = RegInit(Token.default(level + 1))
-    val data_reg = RegInit(Pair.default(level)) // update memory
-
-    // 内嵌两个子模块
-    val mem = Module(new MemBlock(level))
-    val local_cmp = Module(new Cmp(level))
-
-    // mem和RPU信号的连接
-    io.read_in <> mem.io.read
-    io.read_addr_in <> mem.io.read_addr
-    io.data_out <> mem.io.pair_out
-
-    // state
-    val read :: cmp :: write :: Nil = Enum(3)
-    val state = RegInit(read)
+    val data_reg = RegInit(0.U(pair_width(level).W)) // update memory
 
     // io初始化
     io.token_out := Token.default(level + 1)
     io.read_next_out := false.B
     io.read_next_addr_out := DontCare
-    io.data_out := data_reg.asUInt
+    io.data_out := data_reg
 
-    // mem初始化
-    mem.io.read := false.B
-    mem.io.read_addr := DontCare
-    mem.io.write := false.B
-    mem.io.write_addr := DontCare
-    mem.io.write_pair := DontCare
-    
+    // mem parameters
+    val local_data_depth = data_depth(level) // number of nodes
+    val local_data_width = pair_width(level) // data width
+
+    // different types of memory
+    // sram/ffmem的数据线宽度为2 * Node(Pair)
+    val memory : SinglePortMemoryImpl = mem_type match {
+        case "SRAM"  => Module(new SinglePortSram(local_data_depth, local_data_width))
+        case "FFMEM" => Module(new SinglePortFFMem(local_data_depth, local_data_width))
+        case _  => Module(new SinglePortSram(local_data_depth, local_data_width)) // 默认使用单端口SRAM
+    } 
+
+    // memory初始化
+    memory.idle()
+
+    // 内嵌子模块cmp
+    val local_cmp = Module(new Cmp(level))
+
     // local_cmp初始化
     local_cmp.io.token_in := token
-    local_cmp.io.node_in := mem.io.node_out.asTypeOf(new Node(level))
-    local_cmp.io.cur_pair_in := mem.io.pair_out.asTypeOf(new Pair(level))
-    local_cmp.io.next_pair_in := io.next_data_in.asTypeOf(new Pair(level + 1))
+    local_cmp.io.cur_pair_in := data_reg
+    local_cmp.io.next_pair_in := io.next_data_in
         
     // 状态信号，都是wire类型
     val ready = io.token_in.op.pop | io.token_in.op.push.existing // 新的操作到达
+    val local_addr = WireInit(0.U(addr_width(level).W))
+    
+    // state
+    val read :: cmp :: write :: Nil = Enum(3)
+    val state = RegInit(read)
 
     // FSM
-    switch(state) {
+    switch (state) {
         is (read) {
             when (ready) {
-                // 读本层
-                mem.io.read := true.B
-                mem.io.read_addr := io.token_in.position
                 // 读下层
                 io.read_next_out := true.B
-                io.read_next_addr_out := io.token_in.position << 1.U
+                if (level == 1) {
+                    io.read_next_addr_out := 0.U
+                }else {
+                    io.read_next_addr_out := io.token_in.position.tail(1)
+                }
+                // 读本层
+                if (level <= 2) {
+                    local_addr := 0.U
+                }else {
+                    local_addr := io.token_in.position.tail(1) >> 1 // 下取整
+                }
+                // update data
+                data_reg := memory.read(local_addr)
                 // update token
                 token := io.token_in
                 // transition
                 state := cmp
             }.otherwise {}
+            when (io.read_in) { // next RPU
+                local_addr := io.read_addr_in
+                data_reg := memory.read(local_addr)
+            }
             // 三个周期结束后，传递操作给下一层RPU，此时本层已经没有ready信号
             io.token_out := token_next
             token_next := Token.default(level + 1) // 刷新token_next
         }
         is (cmp) {
             // update regs by local_cmp results
-            data_reg := local_cmp.io.pair_out.asTypeOf(new Pair(level))
+            data_reg := local_cmp.io.pair_out
             token_next := local_cmp.io.token_out
             // transition
             state := write
         }
         is (write) {
-            // write back to mem
-            mem.io.write := true.B
-            mem.io.write_addr := token.position
-            mem.io.write_pair := data_reg.asUInt
+            // write back to memory
+            if (level <= 2) {
+                local_addr := 0.U
+            }else {
+                local_addr := token.position.tail(1) >> 1
+            }
+            memory.write(local_addr, data_reg)
             // transition
             state := read
         }
@@ -105,7 +125,6 @@ class RPU (val level : Int) extends Module {
         this.io.token_out <> next.io.token_in
         this.io.read_next_out <> next.io.read_in
         this.io.read_next_addr_out <> next.io.read_addr_in
-        this.io.next_data_in <> next.io.data_out
+        next.io.data_out <> this.io.next_data_in
     }
-
 }

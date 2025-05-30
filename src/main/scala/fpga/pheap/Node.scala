@@ -24,7 +24,7 @@ object Node {
 
 // TNode
 class Token (val level : Int) extends Bundle {
-    val op = new Operator // equals to operation + value(entry)
+    val op = new Operator // operation + value(entry)
     val position = UInt(position_width(level).W)
 }
 object Token {
@@ -35,19 +35,4 @@ object Token {
         token
     }
     def getWidth (level : Int) : Int = (new Token(level)).getWidth
-}
-
-// pair nodes from children
-class Pair (val level : Int) extends Bundle {
-    val left_node = new Node(level)
-    val right_node = new Node(level)
-}
-object Pair {
-    def default (level : Int) : Pair = {
-        val pair = Wire(new Pair(level))
-        pair.left_node := Node.default(level)
-        pair.right_node := Node.default(level)
-        pair
-    }
-    def getWidth (level : Int) : Int = (new Pair(level)).getWidth
 }

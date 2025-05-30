@@ -10,7 +10,7 @@ import fpga.Const._
 object Func {
 
     // pheap parameters
-    val count_of_levels = 4  
+    val count_of_levels = 8  
     val mem_type = "SRAM"
 
     // count_of_entries -> count_of_levels
@@ -24,7 +24,7 @@ object Func {
 
     def position_width (cur_level : Int) : Int = cur_level
 
-    def data_depth (cur_level : Int) : Int = if (cur_level != 1) 1 << (cur_level - 2) else 1 
+    def data_depth (cur_level : Int) : Int = if (cur_level > 1) 1 << (cur_level - 2) else 1 
 
     def addr_width (cur_level : Int) : Int = {
         val depth = data_depth(cur_level)
@@ -35,15 +35,16 @@ object Func {
             log2Ceil(depth)
         }
     }
-
-    // global_index to local_index
-    def g2l (global_index : UInt, cur_level : Int) : UInt = {
-        global_index - (1.U << (cur_level - 1))
-    }
  
-    // 解决初始化问题：如果sram尚未保存数据，手动生成一个默认数据
-    def init_data (node : Node, level : Int) : Node = {
-        Mux(node.value.asUInt === 0.U, Node.default(level), node)
+    // 解决初始化问题：手动生成一个默认数据
+    def init_data (node : Node, cur_level : Int) : Node = {
+        val no_init = node.value.asUInt === 0.U
+        Mux(no_init, Node.default(cur_level), node)
+    }
+
+    // 读写单元位宽 -> 2 * Node
+    def pair_width (cur_level : Int) : Int = {
+        Node.getWidth(cur_level) * 2
     }
 
 }

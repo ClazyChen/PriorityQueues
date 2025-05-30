@@ -12,27 +12,50 @@ import fpga.pheap.Node._
 class Cmp (val level : Int) extends Module {
     val io = IO(new Bundle {
         val token_in = Input(new Token(level))
-        val node_in = Input(new Node(level))
-        val next_pair_in = Input(new Pair(level + 1))
-        val cur_pair_in = Input(new Pair(level))
         val token_out = Output(new Token(level + 1)) // 待更新的token
-        val pair_out = Output(UInt(Pair.getWidth(level).W)) // 待更新的pair
+        val cur_pair_in = Input(UInt(pair_width(level).W))
+        val next_pair_in = Input(UInt(pair_width(level + 1).W))
+        val pair_out = Output(UInt(pair_width(level).W)) // 待更新的pair
     })
 
     // rename signals
-    val token = io.token_in
-    val op = token.op
-    val position = token.position
+    val op = io.token_in.op
+    val position = io.token_in.position
     val push_entry = op.push
-    // 这里是我们要操作的node
-    val node = init_data(io.node_in, level) 
-    val capacity = node.capacity
+
     // 当前层读出的两个结点，用于生成更新信号
-    val left_node = init_data(io.cur_pair_in.left_node, level) 
-    val right_node = init_data(io.cur_pair_in.right_node, level)
+    val cur_pair = io.cur_pair_in.asTypeOf(Vec(2,new Node(level)))
+    val left_node = init_data(cur_pair(0), level) 
+    val right_node = init_data(cur_pair(1), level)
+    val node = Mux(io.token_in.position(0), right_node, left_node)
+    val capacity = node.capacity
+
     // 左右孩子结点
-    val left_child = init_data(io.next_pair_in.left_node, level + 1)
-    val right_child = init_data(io.next_pair_in.right_node, level + 1)
+    val next_pair = io.next_pair_in.asTypeOf(Vec(2,new Node(level + 1)))
+    val left_child = init_data(next_pair(0), level + 1)
+    val right_child = init_data(next_pair(1), level + 1)
+
+    // generate new pair data
+    val update_node = WireInit(Node.default(level)) // 更新当前层的node
+
+    // 注意保持数据一致性(asUInt,asTypeOf)
+    io.pair_out := Mux(position(0)
+    , Cat(update_node.asUInt, cur_pair(0).asUInt)
+    , Cat(cur_pair(1).asUInt, update_node.asUInt))
+
+    // generate new token
+    val update_token = WireInit(Token.default(level + 1)) // 需要传递的token
+    io.token_out := update_token
+
+    val select_child = WireInit(false.B) // 0 -> lc  1 -> rc
+    update_token.op := op 
+    update_token.position := Cat(position, select_child.asUInt)
+
+    // 操作状态信号
+    val done = WireInit(false.B) // 表示操作是否完成,可参考论文内容
+    when (done) {
+        update_token.op := Operator.nop
+    }.otherwise {}
 
     // 四个比较器
     val cmp_push_node = push_entry < node.value
@@ -40,28 +63,8 @@ class Cmp (val level : Int) extends Module {
     val cmp_push_rc = push_entry < right_child.value
     val cmp_lc_rc = left_child.value < right_child.value
 
-    // 辅助信号，都是wire类型
-    val update_node = WireInit(Node.default(level)) // 更新当前层的node
-    val update_token = WireInit(Token.default(level)) // 需要传递的token
-    val select_child = WireInit(false.B) // 0 -> lc  1 -> rc
-
-    // 生成需要更新的pair
-    // 注意保持数据一致性(asUInt,asTypeOf)
-    io.pair_out := Mux(position(0)
-    , Cat(update_node.asUInt, left_node.asUInt)
-    , Cat(right_node.asUInt, update_node.asUInt))
-
-    // 生成需要更新的token
-    update_token.op := op 
-    update_token.position := Cat(position, select_child.asUInt)
-
-    val done = WireInit(false.B) // 表示操作是否完成,可参考论文内容
-    when (done) {
-        update_token.op := Operator.nop
-    }.otherwise {}
-
-    // 初始化
-    io.token_out := update_token
+    val capacity_inc = Mux(capacity === -1.S(capacity_width(level).W).asUInt, capacity, capacity + 1.U)
+    val capacity_dec = Mux(capacity === 0.U(capacity_width(level).W), capacity, capacity - 1.U)
 
     // control
     when (op.pop) { // pop + replace
@@ -72,13 +75,16 @@ class Cmp (val level : Int) extends Module {
                 update_node.value := Mux(cmp_push_node, node.value, push_entry)
                 done := true.B // 已经满足性质
             }.otherwise {
-                update_node.value := Mux(cmp_lc_rc, left_child.value, right_child.value)
+                update_node.value := right_child.value
             }
         }.otherwise { // pop
             update_node.value := Mux(cmp_lc_rc, left_child.value, right_child.value)
         }
         
-        update_node.capacity := Mux(push_entry.existing, capacity ,capacity + 1.U) // 更新capacity
+        // pop则capacity+1；replace则capacity不变
+        when (!op.push.existing) {
+            update_node.capacity := capacity_inc
+        }
         select_child := Mux(cmp_lc_rc, false.B, true.B) // 确定下一位位置，用于生成token
 
     }.otherwise { // push
@@ -89,7 +95,7 @@ class Cmp (val level : Int) extends Module {
                 done := true.B
             }.otherwise {}
 
-            update_node.capacity := capacity - 1.U
+            update_node.capacity := capacity_dec
             select_child := Mux(left_child.capacity === 0.U, true.B, false.B)
         }
     }
